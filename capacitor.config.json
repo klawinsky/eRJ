@@ -1,0 +1,6 @@
+{
+  "appId": "pl.erj.app",
+  "appName": "eRJ",
+  "webDir": "www",
+  "bundledWebRuntime": false
+}
