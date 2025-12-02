@@ -25,6 +25,10 @@
             <label class="form-label small">Hasło</label>
             <input id="loginPassword" type="password" class="form-control" autocomplete="current-password" required>
           </div>
+          <div class="form-check mb-2">
+            <input class="form-check-input" type="checkbox" value="" id="rememberMe">
+            <label class="form-check-label small" for="rememberMe">Nie wylogowuj mnie</label>
+          </div>
           <div class="d-flex gap-2">
             <button id="loginBtn" type="submit" class="btn btn-primary">Zaloguj</button>
             <button id="demoBtn" type="button" class="btn btn-outline-secondary">Demo (admin)</button>
@@ -42,6 +46,7 @@
           <div class="small text-muted" id="loggedUserInfo"></div>
         </div>
         <div class="d-flex gap-2 align-items-center">
+          <button id="btnHome" class="btn btn-outline-secondary btn-sm">Strona główna</button>
           <button id="btnLogout" type="button" class="btn btn-outline-danger btn-sm">Wyloguj</button>
         </div>
       </div>
@@ -103,7 +108,7 @@
             <div class="card tile" id="tilePhonebook" role="button" tabindex="0">
               <div class="card-body text-center">
                 <h5>Książka telefoniczna</h5>
-                <p class="small text-muted">Import/eksport numerów służbowych (CSV/Excel)</p>
+                <p class="small text-muted">Wyświetlanie spisu numerów z repozytorium</p>
               </div>
             </div>
           </div>
@@ -115,7 +120,10 @@
         <div class="card p-3 mb-3">
           <div class="d-flex justify-content-between align-items-center">
             <h5>Obsłuż pociąg</h5>
-            <button id="backFromHandle" class="btn btn-sm btn-outline-secondary">Powrót</button>
+            <div>
+              <button id="backFromHandle" class="btn btn-sm btn-outline-secondary">Powrót</button>
+              <button id="homeFromHandle" class="btn btn-sm btn-outline-primary">Strona główna</button>
+            </div>
           </div>
           <hr>
           <div class="d-flex gap-2 flex-wrap">
@@ -131,7 +139,10 @@
         <div class="card p-3 mb-3">
           <div class="d-flex justify-content-between align-items-center">
             <h5>Przejmij pociąg</h5>
-            <button id="backFromTakeover" class="btn btn-sm btn-outline-secondary">Powrót</button>
+            <div>
+              <button id="backFromTakeover" class="btn btn-sm btn-outline-secondary">Powrót</button>
+              <button id="homeFromTakeover" class="btn btn-sm btn-outline-primary">Strona główna</button>
+            </div>
           </div>
           <hr>
           <form id="takeoverForm" class="row g-2">
@@ -151,11 +162,15 @@
         </div>
       </div>
 
-      <!-- ADMIN PANEL (reused) -->
+      <!-- ADMIN PANEL (tylko w zakładce Administracja) -->
       <div id="adminPanel" class="card p-3 mb-3" style="display:none;">
         <div class="d-flex justify-content-between align-items-center">
           <h5 class="mb-0">Panel administracyjny</h5>
-          <button id="addUserBtn" type="button" class="btn btn-sm btn-primary" data-bs-toggle="modal" data-bs-target="#modalUser">Dodaj użytkownika</button>
+          <div>
+            <button id="backFromAdmin" class="btn btn-sm btn-outline-secondary">Powrót</button>
+            <button id="homeFromAdmin" class="btn btn-sm btn-outline-primary">Strona główna</button>
+            <button id="addUserBtn" type="button" class="btn btn-sm btn-primary" data-bs-toggle="modal" data-bs-target="#modalUser">Dodaj użytkownika</button>
+          </div>
         </div>
         <hr>
         <div id="usersTableContainer" class="table-responsive">
@@ -171,21 +186,21 @@
         <div class="d-flex justify-content-between align-items-center">
           <h5 class="mb-0">Książka telefoniczna</h5>
           <div>
-            <input id="phoneImportFile" type="file" accept=".csv" style="display:none;">
-            <button id="btnImportPhone" class="btn btn-sm btn-outline-primary">Importuj CSV</button>
-            <button id="btnExportPhone" class="btn btn-sm btn-outline-secondary">Eksportuj CSV</button>
+            <button id="backFromPhonebook" class="btn btn-sm btn-outline-secondary">Powrót</button>
+            <button id="homeFromPhonebook" class="btn btn-sm btn-outline-primary">Strona główna</button>
           </div>
         </div>
         <hr>
         <div class="table-responsive">
           <table class="table table-sm" id="phonebookTable">
-            <thead><tr><th>Nazwa</th><th>Rola</th><th>Numer</th><th>Godziny</th><th>Akcje</th></tr></thead>
+            <thead><tr><th>Nazwa</th><th>Rola</th><th>Numer</th><th>Godziny</th></tr></thead>
             <tbody></tbody>
           </table>
         </div>
+        <div class="small text-muted mt-2">Dane pobierane z pliku w repozytorium GitHub (tylko do odczytu).</div>
       </div>
 
-      <!-- REPORT PANEL (reused existing report UI) -->
+      <!-- REPORT PANEL (dynamicznie wstawiany) -->
       <div id="reportPanelContainer" style="display:none;"></div>
 
       <!-- Modale: User -->
