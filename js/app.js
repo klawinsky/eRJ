@@ -62,13 +62,35 @@ document.addEventListener('DOMContentLoaded', async () => {
   }
 
   // login
-  loginForm.addEventListener('submit', async (e)=>{ e.preventDefault(); loginMsg.textContent=''; const id=loginId.value.trim(); const pw=loginPassword.value; const remember = rememberMe.checked; if(!id||!pw) return loginMsg.textContent='Podaj login i hasło.'; const res=await login(id,pw,remember); if(!res.ok) return loginMsg.textContent=res.reason||'Błąd logowania'; await showAppFor(res.user); });
+  loginForm.addEventListener('submit', async (e)=>{ 
+    e.preventDefault(); 
+    loginMsg.textContent=''; 
+    const id=loginId.value.trim(); 
+    const pw=loginPassword.value; 
+    const remember = rememberMe && rememberMe.checked;
+    if(!id||!pw) return loginMsg.textContent='Podaj login i hasło.'; 
+    const res=await login(id,pw,remember); 
+    if(!res.ok) return loginMsg.textContent=res.reason||'Błąd logowania'; 
+    await showAppFor(res.user); 
+  });
 
-  demoBtn.addEventListener('click', ()=>{ loginId.value='klawinski.pawel@gmail.com'; loginPassword.value=adminPlain; rememberMe.checked = true; loginForm.dispatchEvent(new Event('submit',{cancelable:true})); });
+  demoBtn.addEventListener('click', ()=>{ 
+    loginId.value='klawinski.pawel@gmail.com'; 
+    loginPassword.value=adminPlain; 
+    if(rememberMe) rememberMe.checked = true; 
+    loginForm.dispatchEvent(new Event('submit',{cancelable:true})); 
+  });
 
   btnLogout.addEventListener('click', ()=>{ logout(); showLogin(); loginId.value=''; loginPassword.value=''; loginMsg.textContent=''; });
 
-  btnHome.addEventListener('click', ()=>{ dashboard.style.display = 'block'; handleTrainMenu.style.display = 'none'; takeOverMenu.style.display = 'none'; adminPanel.style.display = 'none'; phonebookPanel.style.display = 'none'; reportPanelContainer.style.display = 'none'; });
+  btnHome.addEventListener('click', ()=>{ 
+    dashboard.style.display = 'block'; 
+    handleTrainMenu.style.display = 'none'; 
+    takeOverMenu.style.display = 'none'; 
+    adminPanel.style.display = 'none'; 
+    phonebookPanel.style.display = 'none'; 
+    reportPanelContainer.style.display = 'none'; 
+  });
 
   // Dashboard navigation
   tileHandleTrain.addEventListener('click', ()=>{ dashboard.style.display='none'; handleTrainMenu.style.display='block'; });
@@ -79,7 +101,11 @@ document.addEventListener('DOMContentLoaded', async () => {
   backFromTakeover.addEventListener('click', ()=>{ takeOverMenu.style.display='none'; dashboard.style.display='block'; });
   homeFromTakeover.addEventListener('click', ()=>{ takeOverMenu.style.display='none'; dashboard.style.display='block'; });
 
-  tileAdmin.addEventListener('click', async ()=>{ const u=currentUser(); if(!u||u.role!=='admin') return alert('Brak uprawnień. Panel administracyjny dostępny tylko dla administratora.'); dashboard.style.display='none'; adminPanel.style.display='block'; await refreshUsersTable(); });
+  tileAdmin.addEventListener('click', async ()=>{ 
+    const u=currentUser(); 
+    if(!u||u.role!=='admin') return alert('Brak uprawnień. Panel administracyjny dostępny tylko dla administratora.'); 
+    dashboard.style.display='none'; adminPanel.style.display='block'; await refreshUsersTable(); 
+  });
   backFromAdmin.addEventListener('click', ()=>{ adminPanel.style.display='none'; dashboard.style.display='block'; });
   homeFromAdmin.addEventListener('click', ()=>{ adminPanel.style.display='none'; dashboard.style.display='block'; });
 
@@ -88,7 +114,21 @@ document.addEventListener('DOMContentLoaded', async () => {
   homeFromPhonebook.addEventListener('click', ()=>{ phonebookPanel.style.display='none'; dashboard.style.display='block'; });
 
   // TAKEOVER form
-  takeoverForm.addEventListener('submit', async (e)=>{ e.preventDefault(); takeoverMsg.textContent=''; const trainNum = qs('takeoverTrainNumber').value.trim(); const date = qs('takeoverDate').value; if(!trainNum || !date) return takeoverMsg.textContent='Wypełnij numer pociągu i datę.'; const reports = await listReports(); const found = reports.find(r => (r.sectionA && r.sectionA.trainNumber && r.sectionA.trainNumber.includes(trainNum)) || (r.createdBy && r.createdBy.id === trainNum) || (r.currentDriver && r.currentDriver.id === trainNum)); if(!found) return takeoverMsg.textContent='Nie znaleziono raportu dla podanego numeru i daty.'; const u = currentUser(); found.takenBy = { name: u.name, id: u.id, at: new Date().toISOString() }; found.currentDriver = { name: u.name, id: u.id }; await saveReport(found); openReportUI(found); });
+  takeoverForm.addEventListener('submit', async (e)=>{ 
+    e.preventDefault(); 
+    takeoverMsg.textContent=''; 
+    const trainNum = qs('takeoverTrainNumber').value.trim(); 
+    const date = qs('takeoverDate').value; 
+    if(!trainNum || !date) return takeoverMsg.textContent='Wypełnij numer pociągu i datę.'; 
+    const reports = await listReports(); 
+    const found = reports.find(r => (r.sectionA && r.sectionA.trainNumber && r.sectionA.trainNumber.includes(trainNum)) || (r.createdBy && r.createdBy.id === trainNum) || (r.currentDriver && r.currentDriver.id === trainNum)); 
+    if(!found) return takeoverMsg.textContent='Nie znaleziono raportu dla podanego numeru i daty.'; 
+    const u = currentUser(); 
+    found.takenBy = { name: u.name, id: u.id, at: new Date().toISOString() }; 
+    found.currentDriver = { name: u.name, id: u.id }; 
+    await saveReport(found); 
+    openReportUI(found); 
+  });
 
   // HANDLE TRAIN menu buttons
   btnNewReport.addEventListener('click', async ()=> {
@@ -132,9 +172,39 @@ document.addEventListener('DOMContentLoaded', async () => {
     });
   }
 
-  formUser.addEventListener('submit', async (e)=>{ e.preventDefault(); userFormMsg.textContent=''; const mode=formUser.getAttribute('data-mode')||'add'; const idx=formUser.getAttribute('data-index')||''; const name=qs('u_name').value.trim(); const id=qs('u_id').value.trim(); const zdp=qs('u_zdp').value; const email=qs('u_email').value.trim(); const password=qs('u_password').value; const role=qs('u_role').value; const status=qs('u_status').value; if(!name||!id||!email||!password) return userFormMsg.textContent='Wypełnij wszystkie wymagane pola.'; try{ if(mode==='add'){ await registerUser({name,id,zdp,email,password,role,status}); } else { const patch={name,id,zdp,email,role,status}; if(password) patch.passwordHash = await hashPassword(password); await updateUser(idx,patch); } const bs=bootstrap.Modal.getInstance(modalUser); bs&&bs.hide(); formUser.reset(); await refreshUsersTable(); }catch(err){ userFormMsg.textContent = err.message||'Błąd zapisu użytkownika'; } });
+  formUser.addEventListener('submit', async (e)=>{ 
+    e.preventDefault(); 
+    userFormMsg.textContent=''; 
+    const mode=formUser.getAttribute('data-mode')||'add'; 
+    const idx=formUser.getAttribute('data-index')||''; 
+    const name=qs('u_name').value.trim(); 
+    const id=qs('u_id').value.trim(); 
+    const zdp=qs('u_zdp').value; 
+    const email=qs('u_email').value.trim(); 
+    const password=qs('u_password').value; 
+    const role=qs('u_role').value; 
+    const status=qs('u_status').value; 
+    if(!name||!id||!email||!password) return userFormMsg.textContent='Wypełnij wszystkie wymagane pola.'; 
+    try{ 
+      if(mode==='add'){ await registerUser({name,id,zdp,email,password,role,status}); } 
+      else { const patch={name,id,zdp,email,role,status}; if(password) patch.passwordHash = await hashPassword(password); await updateUser(idx,patch); } 
+      const bs=bootstrap.Modal.getInstance(modalUser); bs&&bs.hide(); formUser.reset(); await refreshUsersTable(); 
+    }catch(err){ userFormMsg.textContent = err.message||'Błąd zapisu użytkownika'; } 
+  });
 
-  usersTableBody.addEventListener('click', async (e)=>{ const btn=e.target.closest('button'); if(!btn) return; const action=btn.getAttribute('data-action'); const key=btn.getAttribute('data-key'); if(action==='edit'){ const u=await getUserByEmailOrId(key); if(!u) return alert('Nie znaleziono użytkownika'); formUser.setAttribute('data-mode','edit'); formUser.setAttribute('data-index',key); qs('u_name').value=u.name||''; qs('u_id').value=u.id||''; qs('u_zdp').value=u.zdp||'WAW'; qs('u_email').value=u.email||''; qs('u_password').value=''; qs('u_role').value=u.role||'user'; qs('u_status').value=u.status||'active'; document.querySelector('#modalUser .modal-title').textContent='Edytuj użytkownika'; new bootstrap.Modal(modalUser).show(); } else if(action==='del'){ if(!confirm('Usunąć użytkownika?')) return; try{ await deleteUser(key); await refreshUsersTable(); }catch(err){ alert('Błąd usuwania: '+(err.message||err)); } } });
+  usersTableBody.addEventListener('click', async (e)=>{ 
+    const btn=e.target.closest('button'); if(!btn) return; 
+    const action=btn.getAttribute('data-action'); const key=btn.getAttribute('data-key'); 
+    if(action==='edit'){ 
+      const u=await getUserByEmailOrId(key); if(!u) return alert('Nie znaleziono użytkownika'); 
+      formUser.setAttribute('data-mode','edit'); formUser.setAttribute('data-index',key); 
+      qs('u_name').value=u.name||''; qs('u_id').value=u.id||''; qs('u_zdp').value=u.zdp||'WAW'; qs('u_email').value=u.email||''; qs('u_password').value=''; qs('u_role').value=u.role||'user'; qs('u_status').value=u.status||'active'; 
+      document.querySelector('#modalUser .modal-title').textContent='Edytuj użytkownika'; new bootstrap.Modal(modalUser).show(); 
+    } else if(action==='del'){ 
+      if(!confirm('Usunąć użytkownika?')) return; 
+      try{ await deleteUser(key); await refreshUsersTable(); }catch(err){ alert('Błąd usuwania: '+(err.message||err)); } 
+    } 
+  });
 
   addUserBtn.addEventListener('click', ()=>{ formUser.setAttribute('data-mode','add'); formUser.setAttribute('data-index',''); formUser.reset(); document.querySelector('#modalUser .modal-title').textContent='Dodaj użytkownika'; userFormMsg.textContent=''; });
 
@@ -357,37 +427,112 @@ document.addEventListener('DOMContentLoaded', async () => {
   // Traction
   const formTraction = qs('formTraction');
   if(formTraction){
-    formTraction.addEventListener('submit', async (e)=>{ e.preventDefault(); try{ const name=qs('t_name').value.trim(), id=qs('t_id').value.trim(), zdp=qs('t_zdp').value, loco=qs('t_loco').value.trim(), from=qs('t_from').value.trim(), to=qs('t_to').value.trim(); if(!name||!id) return alert('Imię i numer są wymagane.'); const entry={name,id,zdp,loco,from,to}; const mode=formTraction.getAttribute('data-mode'); if(mode==='edit'){ const ix=Number(formTraction.getAttribute('data-index')); currentReport.sectionB[ix]=entry; } else { currentReport.sectionB.push(entry); } await saveAndRender(); formTraction.reset(); bootstrap.Modal.getInstance(qs('modalTraction')).hide(); }catch(err){ console.error(err); alert('Błąd zapisu: '+(err.message||err)); bootstrap.Modal.getInstance(qs('modalTraction')).hide(); } });
+    formTraction.addEventListener('submit', async (e)=>{ 
+      e.preventDefault(); 
+      try{ 
+        const name=qs('t_name').value.trim(), id=qs('t_id').value.trim(), zdp=qs('t_zdp').value, loco=qs('t_loco').value.trim(), from=qs('t_from').value.trim(), to=qs('t_to').value.trim(); 
+        if(!name||!id) return alert('Imię i numer są wymagane.'); 
+        const entry={name,id,zdp,loco,from,to}; 
+        const mode=formTraction.getAttribute('data-mode'); 
+        if(mode==='edit'){ const ix=Number(formTraction.getAttribute('data-index')); currentReport.sectionB[ix]=entry; } else { currentReport.sectionB.push(entry); } 
+        await saveAndRender(); formTraction.reset(); bootstrap.Modal.getInstance(qs('modalTraction')).hide(); 
+      }catch(err){ console.error(err); alert('Błąd zapisu: '+(err.message||err)); bootstrap.Modal.getInstance(qs('modalTraction')).hide(); } 
+    });
   }
 
   // Conductor
   const formConductor = qs('formConductor');
   if(formConductor){
-    formConductor.addEventListener('submit', async (e)=>{ e.preventDefault(); try{ const name=qs('c_name').value.trim(), id=qs('c_id').value.trim(), zdp=qs('c_zdp').value, role=qs('c_role').value, from=qs('c_from').value.trim(), to=qs('c_to').value.trim(); if(!name||!id) return alert('Imię i numer są wymagane.'); const entry={name,id,zdp,role,from,to}; const mode=formConductor.getAttribute('data-mode'); if(mode==='edit'){ const ix=Number(formConductor.getAttribute('data-index')); currentReport.sectionC[ix]=entry; } else { currentReport.sectionC.push(entry); } await saveAndRender(); formConductor.reset(); bootstrap.Modal.getInstance(qs('modalConductor')).hide(); }catch(err){ console.error(err); alert('Błąd zapisu: '+(err.message||err)); bootstrap.Modal.getInstance(qs('modalConductor')).hide(); } });
+    formConductor.addEventListener('submit', async (e)=>{ 
+      e.preventDefault(); 
+      try{ 
+        const name=qs('c_name').value.trim(), id=qs('c_id').value.trim(), zdp=qs('c_zdp').value, role=qs('c_role').value, from=qs('c_from').value.trim(), to=qs('c_to').value.trim(); 
+        if(!name||!id) return alert('Imię i numer są wymagane.'); 
+        const entry={name,id,zdp,role,from,to}; 
+        const mode=formConductor.getAttribute('data-mode'); 
+        if(mode==='edit'){ const ix=Number(formConductor.getAttribute('data-index')); currentReport.sectionC[ix]=entry; } else { currentReport.sectionC.push(entry); } 
+        await saveAndRender(); formConductor.reset(); bootstrap.Modal.getInstance(qs('modalConductor')).hide(); 
+      }catch(err){ console.error(err); alert('Błąd zapisu: '+(err.message||err)); bootstrap.Modal.getInstance(qs('modalConductor')).hide(); } 
+    });
   }
 
   // Order
   const formOrder = qs('formOrder');
   if(formOrder){
-    formOrder.addEventListener('submit', async (e)=>{ e.preventDefault(); try{ const number=qs('o_number').value.trim(), time=qs('o_time').value.trim(), text=qs('o_text').value.trim(), source=qs('o_source').value; if(!text) return alert('Treść dyspozycji jest wymagana.'); if(!isValidTime(time)) return alert('Godzina musi być HH:MM.'); const entry={number,time,text,source}; const mode=formOrder.getAttribute('data-mode'); if(mode==='edit'){ const ix=Number(formOrder.getAttribute('data-index')); currentReport.sectionD[ix]=entry; } else { currentReport.sectionD.push(entry); } await saveAndRender(); formOrder.reset(); bootstrap.Modal.getInstance(qs('modalOrder')).hide(); }catch(err){ console.error(err); alert('Błąd zapisu: '+(err.message||err)); bootstrap.Modal.getInstance(qs('modalOrder')).hide(); } });
+    formOrder.addEventListener('submit', async (e)=>{ 
+      e.preventDefault(); 
+      try{ 
+        const number=qs('o_number').value.trim(), time=qs('o_time').value.trim(), text=qs('o_text').value.trim(), source=qs('o_source').value; 
+        if(!text) return alert('Treść dyspozycji jest wymagana.'); 
+        if(time && !isValidTime(time)) return alert('Godzina musi być HH:MM.'); 
+        const entry={number,time,text,source}; 
+        const mode=formOrder.getAttribute('data-mode'); 
+        if(mode==='edit'){ const ix=Number(formOrder.getAttribute('data-index')); currentReport.sectionD[ix]=entry; } else { currentReport.sectionD.push(entry); } 
+        await saveAndRender(); formOrder.reset(); bootstrap.Modal.getInstance(qs('modalOrder')).hide(); 
+      }catch(err){ console.error(err); alert('Błąd zapisu: '+(err.message||err)); bootstrap.Modal.getInstance(qs('modalOrder')).hide(); } 
+    });
   }
 
   // Station
   const formStation = qs('formStation');
   if(formStation){
-    formStation.addEventListener('submit', async (e)=>{ e.preventDefault(); try{ const station=qs('s_station').value.trim(); const dateArrPlan=qs('s_dateArr').value, dateArrReal=qs('s_dateArrReal').value; const dateDepPlan=qs('s_dateDep').value, dateDepReal=qs('s_dateDepReal').value; const planArr=qs('s_planArr').value.trim(), planDep=qs('s_planDep').value.trim(); const realArr=qs('s_realArr').value.trim(), realDep=qs('s_realDep').value.trim(); const delayReason=qs('s_delayReason').value.trim(), writtenOrders=qs('s_writtenOrders').value.trim(); if(!station) return alert('Nazwa stacji jest wymagana.'); if(!isValidTime(planArr)||!isValidTime(planDep)||!isValidTime(realArr)||!isValidTime(realDep)) return alert('Czas HH:MM lub puste.'); const fallback = qs('r_date')?.value || currentReport.sectionA.date || ''; const planArrDT=parseDateTime(dateArrPlan,planArr,fallback); const realArrDT=parseDateTime(dateArrReal,realArr,fallback); const planDepDT=parseDateTime(dateDepPlan,planDep,fallback); const realDepDT=parseDateTime(dateDepReal,realDep,fallback); let delayArrMinutes=null; if(planArrDT&&realArrDT) delayArrMinutes=Math.round((realArrDT-planArrDT)/60000); let delayDepMinutes=null; if(planDepDT&&realDepDT) delayDepMinutes=Math.round((realDepDT-planDepDT)/60000); let realStopMinutes=null; if(realArrDT&&realDepDT) realStopMinutes=Math.round((realDepDT-realArrDT)/60000); const entry={ station, dateArr:dateArrPlan, planArr, dateArrReal, realArr, dateDep:dateDepPlan, planDep, dateDepReal, realDep, delayArrMinutes, delayDepMinutes, realStopMinutes, delayReason, writtenOrders }; const mode=formStation.getAttribute('data-mode'); if(mode==='edit'){ const ix=Number(formStation.getAttribute('data-index')); currentReport.sectionE[ix]=entry; } else { currentReport.sectionE.push(entry); } await saveAndRender(); formStation.reset(); bootstrap.Modal.getInstance(qs('modalStation')).hide(); }catch(err){ console.error(err); alert('Błąd zapisu: '+(err.message||err)); bootstrap.Modal.getInstance(qs('modalStation')).hide(); } });
+    formStation.addEventListener('submit', async (e)=>{ 
+      e.preventDefault(); 
+      try{ 
+        const station=qs('s_station').value.trim(); 
+        const dateArrPlan=qs('s_dateArr').value, dateArrReal=qs('s_dateArrReal').value; 
+        const dateDepPlan=qs('s_dateDep').value, dateDepReal=qs('s_dateDepReal').value; 
+        const planArr=qs('s_planArr').value.trim(), planDep=qs('s_planDep').value.trim(); 
+        const realArr=qs('s_realArr').value.trim(), realDep=qs('s_realDep').value.trim(); 
+        const delayReason=qs('s_delayReason').value.trim(), writtenOrders=qs('s_writtenOrders').value.trim(); 
+        if(!station) return alert('Nazwa stacji jest wymagana.'); 
+        if(!isValidTime(planArr)||!isValidTime(planDep)||!isValidTime(realArr)||!isValidTime(realDep)) return alert('Czas HH:MM lub puste.'); 
+        const fallback = qs('r_date')?.value || currentReport.sectionA.date || ''; 
+        const planArrDT=parseDateTime(dateArrPlan,planArr,fallback); 
+        const realArrDT=parseDateTime(dateArrReal,realArr,fallback); 
+        const planDepDT=parseDateTime(dateDepPlan,planDep,fallback); 
+        const realDepDT=parseDateTime(dateDepReal,realDep,fallback); 
+        let delayArrMinutes=null; if(planArrDT&&realArrDT) delayArrMinutes=Math.round((realArrDT-planArrDT)/60000); 
+        let delayDepMinutes=null; if(planDepDT&&realDepDT) delayDepMinutes=Math.round((realDepDT-planDepDT)/60000); 
+        let realStopMinutes=null; if(realArrDT&&realDepDT) realStopMinutes=Math.round((realDepDT-realArrDT)/60000); 
+        const entry={ station, dateArr:dateArrPlan, planArr, dateArrReal, realArr, dateDep:dateDepPlan, planDep, dateDepReal, realDep, delayArrMinutes, delayDepMinutes, realStopMinutes, delayReason, writtenOrders }; 
+        const mode=formStation.getAttribute('data-mode'); 
+        if(mode==='edit'){ const ix=Number(formStation.getAttribute('data-index')); currentReport.sectionE[ix]=entry; } else { currentReport.sectionE.push(entry); } 
+        await saveAndRender(); formStation.reset(); bootstrap.Modal.getInstance(qs('modalStation')).hide(); 
+      }catch(err){ console.error(err); alert('Błąd zapisu: '+(err.message||err)); bootstrap.Modal.getInstance(qs('modalStation')).hide(); } 
+    });
   }
 
   // Control
   const formControl = qs('formControl');
   if(formControl){
-    formControl.addEventListener('submit', async (e)=>{ e.preventDefault(); try{ const by=qs('f_by').value.trim(), id=qs('f_id').value.trim(), desc=qs('f_desc').value.trim(), notes=qs('f_notes').value.trim(); if(!by) return alert('Imię i nazwisko kontrolującego jest wymagane.'); const entry={by,id,desc,notes}; const mode=formControl.getAttribute('data-mode'); if(mode==='edit'){ const ix=Number(formControl.getAttribute('data-index')); currentReport.sectionF[ix]=entry; } else { currentReport.sectionF.push(entry); } await saveAndRender(); formControl.reset(); bootstrap.Modal.getInstance(qs('modalControl')).hide(); }catch(err){ console.error(err); alert('Błąd zapisu: '+(err.message||err)); bootstrap.Modal.getInstance(qs('modalControl')).hide(); } });
+    formControl.addEventListener('submit', async (e)=>{ 
+      e.preventDefault(); 
+      try{ 
+        const by=qs('f_by').value.trim(), id=qs('f_id').value.trim(), desc=qs('f_desc').value.trim(), notes=qs('f_notes').value.trim(); 
+        if(!by) return alert('Imię i nazwisko kontrolującego jest wymagane.'); 
+        const entry={by,id,desc,notes}; 
+        const mode=formControl.getAttribute('data-mode'); 
+        if(mode==='edit'){ const ix=Number(formControl.getAttribute('data-index')); currentReport.sectionF[ix]=entry; } else { currentReport.sectionF.push(entry); } 
+        await saveAndRender(); formControl.reset(); bootstrap.Modal.getInstance(qs('modalControl')).hide(); 
+      }catch(err){ console.error(err); alert('Błąd zapisu: '+(err.message||err)); bootstrap.Modal.getInstance(qs('modalControl')).hide(); } 
+    });
   }
 
   // Note
   const formNote = qs('formNote');
   if(formNote){
-    formNote.addEventListener('submit', async (e)=>{ e.preventDefault(); try{ const text=qs('n_text').value.trim(); if(!text) return alert('Treść uwagi jest wymagana.'); const entry={text}; const mode=formNote.getAttribute('data-mode'); if(mode==='edit'){ const ix=Number(formNote.getAttribute('data-index')); currentReport.sectionG[ix]=entry; } else { currentReport.sectionG.push(entry); } await saveAndRender(); formNote.reset(); bootstrap.Modal.getInstance(qs('modalNote')).hide(); }catch(err){ console.error(err); alert('Błąd zapisu: '+(err.message||err)); bootstrap.Modal.getInstance(qs('modalNote')).hide(); } });
+    formNote.addEventListener('submit', async (e)=>{ 
+      e.preventDefault(); 
+      try{ 
+        const text=qs('n_text').value.trim(); 
+        if(!text) return alert('Treść uwagi jest wymagana.'); 
+        const entry={text}; 
+        const mode=formNote.getAttribute('data-mode'); 
+        if(mode==='edit'){ const ix=Number(formNote.getAttribute('data-index')); currentReport.sectionG[ix]=entry; } else { currentReport.sectionG.push(entry); } 
+        await saveAndRender(); formNote.reset(); bootstrap.Modal.getInstance(qs('modalNote')).hide(); 
+      }catch(err){ console.error(err); alert('Błąd zapisu: '+(err.message||err)); bootstrap.Modal.getInstance(qs('modalNote')).hide(); } 
+    });
   }
 
   // ---------- Open Report UI (build full A-G UI) ----------
@@ -572,7 +717,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       container.appendChild(makeCrewTable('B - Drużyna trakcyjna', currentReport.sectionB, ['name','id','zdp','loco','from','to']));
       container.appendChild(makeCrewTable('C - Drużyna konduktorska', currentReport.sectionC, ['name','id','zdp','role','from','to']));
       // D
-      const secDprint = document.createElement('div'); secDprint.className='section'; secDprint.innerHTML = `<h6>D - Dyspozycje</h6>`;
+      const secDprint = document.createElement('div'); secDprint.className = 'section'; secDprint.innerHTML = `<h6>D - Dyspozycje</h6>`;
       if((currentReport.sectionD||[]).length===0) secDprint.innerHTML += `<div>-</div>`; else {
         const t = document.createElement('table'); t.className='table-print';
         t.innerHTML = `<thead><tr><th>Nr</th><th>Godz.</th><th>Treść</th><th>Źródło</th></tr></thead><tbody>${currentReport.sectionD.map(o=>`<tr><td>${safeText(o.number)}</td><td>${safeText(o.time)}</td><td>${safeText(o.text)}</td><td>${safeText(o.source)}</td></tr>`).join('')}</tbody>`;
@@ -582,4 +727,38 @@ document.addEventListener('DOMContentLoaded', async () => {
       // E
       const secEprint = document.createElement('div'); secEprint.className='section'; secEprint.innerHTML = `<h6>E - Dane o jeździe pociągu</h6>`;
       const tableE = document.createElement('table'); tableE.className='table-print';
-      tableE.innerHTML = `<thead><tr><th>Stacja</th><th>Przyj. (plan)</th><th>Przyj. (real)</th><th>Odch. przyj.</th><th>Odj. (plan)</th><th>Odj. (real)</th><th>Odch. odj.</th><th>Postój</th><th>Powód/Rozkazy</th></tr></thead><tbody>${(currentReport.sectionE||[]).length===0?`<tr><td colspan="9">-</td></tr>`: currentReport.sectionE.map(s=>{ const arrVal=(s.delayArrMinutes!=null)?`${s.delayArrMinutes} min`:'-'; const depVal=(s.delayDepMinutes!=null)?`${s.delayDepMinutes} min`:'-'; const stop=s.realStopMinutes!=null?`${s.realStopMinutes}`:'-'; const pow=(s.delayReason||'-')+(s.writtenOrders? ' / '+s.writtenOrders : ''); return `<tr><td>${safeText(s.station)}</td><td>${safeText(s.dateArr)} ${safeText(s.planArr)}</td><td>${safeText(s.dateArrReal)} ${safeText(s.realArr)}</td><td>${arrVal}</
+      tableE.innerHTML = `<thead><tr><th>Stacja</th><th>Przyj. (plan)</th><th>Przyj. (real)</th><th>Odch. przyj.</th><th>Odj. (plan)</th><th>Odj. (real)</th><th>Odch. odj.</th><th>Postój</th><th>Powód/Rozkazy</th></tr></thead><tbody>${(currentReport.sectionE||[]).length===0?`<tr><td colspan="9">-</td></tr>`: currentReport.sectionE.map(s=>{ const arrVal=(s.delayArrMinutes!=null)?`${s.delayArrMinutes} min`:'-'; const depVal=(s.delayDepMinutes!=null)?`${s.delayDepMinutes} min`:'-'; const stop=s.realStopMinutes!=null?`${s.realStopMinutes}`:'-'; const pow=(s.delayReason||'-')+(s.writtenOrders? ' / '+s.writtenOrders : ''); return `<tr><td>${safeText(s.station)}</td><td>${safeText(s.dateArr)} ${safeText(s.planArr)}</td><td>${safeText(s.dateArrReal)} ${safeText(s.realArr)}</td><td>${arrVal}</td><td>${safeText(s.dateDep)} ${safeText(s.planDep)}</td><td>${safeText(s.dateDepReal)} ${safeText(s.realDep)}</td><td>${depVal}</td><td>${stop}</td><td>${pow}</td></tr>`; }).join('')}</tbody>`;
+      secEprint.appendChild(tableE); container.appendChild(secEprint);
+      // F
+      const secFprint = document.createElement('div'); secFprint.className='section'; secFprint.innerHTML = `<h6>F - Kontrola pociągu</h6>`;
+      if((currentReport.sectionF||[]).length===0) secFprint.innerHTML += `<div>-</div>`; else {
+        const t = document.createElement('table'); t.className='table-print';
+        t.innerHTML = `<thead><tr><th>Kontrolujący</th><th>Nr</th><th>Opis</th><th>Uwagi</th></tr></thead><tbody>${currentReport.sectionF.map(c=>`<tr><td>${safeText(c.by)}</td><td>${safeText(c.id)}</td><td>${safeText(c.desc)}</td><td>${safeText(c.notes)}</td></tr>`).join('')}</tbody>`;
+        secFprint.appendChild(t);
+      }
+      container.appendChild(secFprint);
+      // G
+      const secGprint = document.createElement('div'); secGprint.className='section'; secGprint.innerHTML = `<h6>G - Uwagi kierownika pociągu</h6>`;
+      if((currentReport.sectionG||[]).length===0) secGprint.innerHTML += `<div>-</div>`; else {
+        const ul = document.createElement('ul'); currentReport.sectionG.forEach(n=>{ const li = document.createElement('li'); li.textContent = n.text; ul.appendChild(li); }); secGprint.appendChild(ul);
+      }
+      container.appendChild(secGprint);
+
+      const footer = document.createElement('div'); footer.className='print-footer'; footer.textContent = `Wygenerowano dnia ${new Date().toLocaleString()} z systemu eRJ`;
+      container.appendChild(footer);
+
+      await exportPdf(container, `${currentReport.number.replace(/\//g,'-')}.pdf`);
+    });
+
+    // initial render lists
+    renderReportHeader();
+    renderLists();
+  }
+
+  // expose helper for takeover to open report
+  window.openReportUI = openReportUI;
+
+  // initial refreshes
+  await refreshUsersTable();
+  await loadPhonebookFromGithub();
+});
