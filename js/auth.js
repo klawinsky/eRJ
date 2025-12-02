@@ -10,6 +10,7 @@ export async function hashPassword(password) {
 }
 
 const AUTH_KEY = 'erj_current_user';
+const AUTH_PERSIST_KEY = 'erj_current_user_persist';
 
 export async function initAuth() {
   const adminPlain = 'Admin@77144';
@@ -34,22 +35,31 @@ export async function registerUser({ name, id, zdp, email, password, role='user'
   return user;
 }
 
-export async function login(loginId, password) {
+export async function login(loginId, password, remember=false) {
   const user = await getUserByEmailOrId(loginId);
   if (!user) return { ok:false, reason:'Nie znaleziono użytkownika' };
   if (user.status !== 'active') return { ok:false, reason:'Konto nieaktywne' };
   const hash = await hashPassword(password);
   if (hash !== user.passwordHash) return { ok:false, reason:'Nieprawidłowe hasło' };
   const session = { email: user.email, id: user.id, name: user.name, role: user.role, zdp: user.zdp, loggedAt: new Date().toISOString() };
+  // store session: if remember true -> persist key, else store ephemeral
   localStorage.setItem(AUTH_KEY, JSON.stringify(session));
+  if (remember) localStorage.setItem(AUTH_PERSIST_KEY, JSON.stringify(session));
+  else localStorage.removeItem(AUTH_PERSIST_KEY);
   return { ok:true, user: session };
 }
 
 export function logout() {
   localStorage.removeItem(AUTH_KEY);
+  localStorage.removeItem(AUTH_PERSIST_KEY);
 }
 
 export function currentUser() {
+  // if persistent session exists, restore it to AUTH_KEY
+  const persist = localStorage.getItem(AUTH_PERSIST_KEY);
+  if (persist && !localStorage.getItem(AUTH_KEY)) {
+    localStorage.setItem(AUTH_KEY, persist);
+  }
   const raw = localStorage.getItem(AUTH_KEY);
   if (!raw) return null;
   try { return JSON.parse(raw); } catch (e) { return null; }
