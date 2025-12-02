@@ -44,7 +44,6 @@ document.addEventListener('DOMContentLoaded', async () => {
   async function showAppFor(user){
     loginView.style.display='none'; appShell.style.display='block';
     loggedUserInfo.textContent = `${user.name} (${user.id}) · ${user.role}`;
-    // admin panel hidden by default; only show when user clicks Administracja tile
     adminPanel.style.display = 'none';
     dashboard.style.display = 'block';
     handleTrainMenu.style.display = 'none';
@@ -59,8 +58,6 @@ document.addEventListener('DOMContentLoaded', async () => {
   const sess = currentUser();
   showLogin();
   if (sess) {
-    // restore but still show login; if user wants auto-login they can check rememberMe
-    // We'll auto-show app if persistent session exists (currentUser restored it)
     await showAppFor(sess);
   }
 
@@ -71,14 +68,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   btnLogout.addEventListener('click', ()=>{ logout(); showLogin(); loginId.value=''; loginPassword.value=''; loginMsg.textContent=''; });
 
-  btnHome.addEventListener('click', ()=>{ // always go to dashboard
-    dashboard.style.display = 'block';
-    handleTrainMenu.style.display = 'none';
-    takeOverMenu.style.display = 'none';
-    adminPanel.style.display = 'none';
-    phonebookPanel.style.display = 'none';
-    reportPanelContainer.style.display = 'none';
-  });
+  btnHome.addEventListener('click', ()=>{ dashboard.style.display = 'block'; handleTrainMenu.style.display = 'none'; takeOverMenu.style.display = 'none'; adminPanel.style.display = 'none'; phonebookPanel.style.display = 'none'; reportPanelContainer.style.display = 'none'; });
 
   // Dashboard navigation
   tileHandleTrain.addEventListener('click', ()=>{ dashboard.style.display='none'; handleTrainMenu.style.display='block'; });
@@ -185,7 +175,6 @@ document.addEventListener('DOMContentLoaded', async () => {
   let currentReport = null;
 
   function renderReportHeader() {
-    // header is part of UI created in openReportUI
     const headerNumber = qs('rp_number');
     const headerUser = qs('rp_user');
     if(headerNumber) headerNumber.textContent = currentReport.number || '-';
@@ -193,7 +182,6 @@ document.addEventListener('DOMContentLoaded', async () => {
   }
 
   function renderLists() {
-    // tractionList, conductorList, ordersList, stationsList, controlsList, notesList exist in DOM
     function renderList(containerId, arr, renderer) {
       const container = qs(containerId);
       if(!container) return;
@@ -277,7 +265,6 @@ document.addEventListener('DOMContentLoaded', async () => {
   async function saveAndRender(){
     if(!currentReport) return;
     currentReport.lastEditedAt = new Date().toISOString();
-    // section A fields
     const cat = qs('r_cat')?.value || '';
     const traction = qs('r_traction')?.value || '';
     const trainNumber = qs('r_trainNumber')?.value || '';
@@ -289,7 +276,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     renderLists();
   }
 
-  // Edit modal helper (we reuse modals already present in index.html)
+  // Edit modal helper
   function openEditModal(type, idx){
     if(!currentReport) return;
     if(type==='traction'){
@@ -403,13 +390,9 @@ document.addEventListener('DOMContentLoaded', async () => {
     formNote.addEventListener('submit', async (e)=>{ e.preventDefault(); try{ const text=qs('n_text').value.trim(); if(!text) return alert('Treść uwagi jest wymagana.'); const entry={text}; const mode=formNote.getAttribute('data-mode'); if(mode==='edit'){ const ix=Number(formNote.getAttribute('data-index')); currentReport.sectionG[ix]=entry; } else { currentReport.sectionG.push(entry); } await saveAndRender(); formNote.reset(); bootstrap.Modal.getInstance(qs('modalNote')).hide(); }catch(err){ console.error(err); alert('Błąd zapisu: '+(err.message||err)); bootstrap.Modal.getInstance(qs('modalNote')).hide(); } });
   }
 
-  // ---------- Export / Import JSON & PDF ----------
-  // These are wired inside openReportUI for the current report
-
   // ---------- Open Report UI (build full A-G UI) ----------
   function openReportUI(report) {
     currentReport = report;
-    // hide other panels
     dashboard.style.display = 'none';
     handleTrainMenu.style.display = 'none';
     takeOverMenu.style.display = 'none';
@@ -440,12 +423,12 @@ document.addEventListener('DOMContentLoaded', async () => {
     card.appendChild(secA);
 
     // Sections B-G containers
-    const secB = el('div','mb-3 card p-3'); secB.innerHTML = `<div class="d-flex justify-content-between align-items-center"><h6 class="mb-0">B - Drużyna trakcyjna</h6><div><button id="addTractionBtn" class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#modalTraction">Dodaj</button></div></div><div id="tractionList" class="mt-2"></div>`;
-    const secC = el('div','mb-3 card p-3'); secC.innerHTML = `<div class="d-flex justify-content-between align-items-center"><h6 class="mb-0">C - Drużyna konduktorska</h6><div><button id="addConductorBtn" class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#modalConductor">Dodaj</button></div></div><div id="conductorList" class="mt-2"></div>`;
-    const secD = el('div','mb-3 card p-3'); secD.innerHTML = `<div class="d-flex justify-content-between align-items-center"><h6 class="mb-0">D - Dyspozycje</h6><div><button id="addOrderBtn" class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#modalOrder">Dodaj</button></div></div><div id="ordersList" class="mt-2"></div>`;
-    const secE = el('div','mb-3 card p-3'); secE.innerHTML = `<div class="d-flex justify-content-between align-items-center"><h6 class="mb-0">E - Dane o jeździe pociągu</h6><div><button id="addStationBtn" class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#modalStation">Dodaj</button></div></div><div id="stationsList" class="mt-2"></div>`;
-    const secF = el('div','mb-3 card p-3'); secF.innerHTML = `<div class="d-flex justify-content-between align-items-center"><h6 class="mb-0">F - Kontrola pociągu</h6><div><button id="addControlBtn" class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#modalControl">Dodaj</button></div></div><div id="controlsList" class="mt-2"></div>`;
-    const secG = el('div','mb-3 card p-3'); secG.innerHTML = `<div class="d-flex justify-content-between align-items-center"><h6 class="mb-0">G - Uwagi kierownika pociągu</h6><div><button id="addNoteBtn" class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#modalNote">Dodaj</button></div></div><div id="notesList" class="mt-2"></div>`;
+    const secB = el('div','mb-3 card p-3'); secB.innerHTML = `<div class="d-flex justify-content-between align-items-center"><h6 class="mb-0">B - Drużyna trakcyjna</h6><div><button id="addTractionBtn" class="btn btn-sm btn-outline-primary">Dodaj</button></div></div><div id="tractionList" class="mt-2"></div>`;
+    const secC = el('div','mb-3 card p-3'); secC.innerHTML = `<div class="d-flex justify-content-between align-items-center"><h6 class="mb-0">C - Drużyna konduktorska</h6><div><button id="addConductorBtn" class="btn btn-sm btn-outline-primary">Dodaj</button></div></div><div id="conductorList" class="mt-2"></div>`;
+    const secD = el('div','mb-3 card p-3'); secD.innerHTML = `<div class="d-flex justify-content-between align-items-center"><h6 class="mb-0">D - Dyspozycje</h6><div><button id="addOrderBtn" class="btn btn-sm btn-outline-primary">Dodaj</button></div></div><div id="ordersList" class="mt-2"></div>`;
+    const secE = el('div','mb-3 card p-3'); secE.innerHTML = `<div class="d-flex justify-content-between align-items-center"><h6 class="mb-0">E - Dane o jeździe pociągu</h6><div><button id="addStationBtn" class="btn btn-sm btn-outline-primary">Dodaj</button></div></div><div id="stationsList" class="mt-2"></div>`;
+    const secF = el('div','mb-3 card p-3'); secF.innerHTML = `<div class="d-flex justify-content-between align-items-center"><h6 class="mb-0">F - Kontrola pociągu</h6><div><button id="addControlBtn" class="btn btn-sm btn-outline-primary">Dodaj</button></div></div><div id="controlsList" class="mt-2"></div>`;
+    const secG = el('div','mb-3 card p-3'); secG.innerHTML = `<div class="d-flex justify-content-between align-items-center"><h6 class="mb-0">G - Uwagi kierownika pociągu</h6><div><button id="addNoteBtn" class="btn btn-sm btn-outline-primary">Dodaj</button></div></div><div id="notesList" class="mt-2"></div>`;
 
     card.appendChild(secB); card.appendChild(secC); card.appendChild(secD); card.appendChild(secE); card.appendChild(secF); card.appendChild(secG);
 
@@ -484,6 +467,56 @@ document.addEventListener('DOMContentLoaded', async () => {
       elid.addEventListener('change', saveAndRender);
       elid.addEventListener('input', saveAndRender);
     });
+
+    // wire add buttons to set form mode and open modal
+    const addTractionBtn = qs('addTractionBtn');
+    if(addTractionBtn){
+      addTractionBtn.addEventListener('click', ()=> {
+        const form = qs('formTraction');
+        if(form){ form.setAttribute('data-mode','add'); form.setAttribute('data-index',''); }
+        new bootstrap.Modal(qs('modalTraction')).show();
+      });
+    }
+    const addConductorBtn = qs('addConductorBtn');
+    if(addConductorBtn){
+      addConductorBtn.addEventListener('click', ()=> {
+        const form = qs('formConductor');
+        if(form){ form.setAttribute('data-mode','add'); form.setAttribute('data-index',''); }
+        new bootstrap.Modal(qs('modalConductor')).show();
+      });
+    }
+    const addOrderBtn = qs('addOrderBtn');
+    if(addOrderBtn){
+      addOrderBtn.addEventListener('click', ()=> {
+        const form = qs('formOrder');
+        if(form){ form.setAttribute('data-mode','add'); form.setAttribute('data-index',''); }
+        new bootstrap.Modal(qs('modalOrder')).show();
+      });
+    }
+    const addStationBtn = qs('addStationBtn');
+    if(addStationBtn){
+      addStationBtn.addEventListener('click', ()=> {
+        const form = qs('formStation');
+        if(form){ form.setAttribute('data-mode','add'); form.setAttribute('data-index',''); }
+        new bootstrap.Modal(qs('modalStation')).show();
+      });
+    }
+    const addControlBtn = qs('addControlBtn');
+    if(addControlBtn){
+      addControlBtn.addEventListener('click', ()=> {
+        const form = qs('formControl');
+        if(form){ form.setAttribute('data-mode','add'); form.setAttribute('data-index',''); }
+        new bootstrap.Modal(qs('modalControl')).show();
+      });
+    }
+    const addNoteBtn = qs('addNoteBtn');
+    if(addNoteBtn){
+      addNoteBtn.addEventListener('click', ()=> {
+        const form = qs('formNote');
+        if(form){ form.setAttribute('data-mode','add'); form.setAttribute('data-index',''); }
+        new bootstrap.Modal(qs('modalNote')).show();
+      });
+    }
 
     // wire export/import/pdf
     btnExportJson.addEventListener('click', ()=> {
@@ -524,7 +557,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         <tr><th>Data kursu</th><td>${safeText(currentReport.sectionA.date)}</td></tr>
       </tbody></table>`;
       container.appendChild(secAprint);
-      // B,C,D,E,F,G simplified tables
+      // B-G simplified
       function makeCrewTable(title, arr, cols){
         const s = document.createElement('div'); s.className='section';
         s.innerHTML = `<h6>${title}</h6>`;
@@ -549,38 +582,4 @@ document.addEventListener('DOMContentLoaded', async () => {
       // E
       const secEprint = document.createElement('div'); secEprint.className='section'; secEprint.innerHTML = `<h6>E - Dane o jeździe pociągu</h6>`;
       const tableE = document.createElement('table'); tableE.className='table-print';
-      tableE.innerHTML = `<thead><tr><th>Stacja</th><th>Przyj. (plan)</th><th>Przyj. (real)</th><th>Odch. przyj.</th><th>Odj. (plan)</th><th>Odj. (real)</th><th>Odch. odj.</th><th>Postój</th><th>Powód/Rozkazy</th></tr></thead><tbody>${(currentReport.sectionE||[]).length===0?`<tr><td colspan="9">-</td></tr>`: currentReport.sectionE.map(s=>{ const arrVal=(s.delayArrMinutes!=null)?`${s.delayArrMinutes} min`:'-'; const depVal=(s.delayDepMinutes!=null)?`${s.delayDepMinutes} min`:'-'; const stop=s.realStopMinutes!=null?`${s.realStopMinutes}`:'-'; const pow=(s.delayReason||'-')+(s.writtenOrders? ' / '+s.writtenOrders : ''); return `<tr><td>${safeText(s.station)}</td><td>${safeText(s.dateArr)} ${safeText(s.planArr)}</td><td>${safeText(s.dateArrReal)} ${safeText(s.realArr)}</td><td>${arrVal}</td><td>${safeText(s.dateDep)} ${safeText(s.planDep)}</td><td>${safeText(s.dateDepReal)} ${safeText(s.realDep)}</td><td>${depVal}</td><td>${stop}</td><td>${pow}</td></tr>`; }).join('')}</tbody>`;
-      secEprint.appendChild(tableE); container.appendChild(secEprint);
-      // F
-      const secFprint = document.createElement('div'); secFprint.className='section'; secFprint.innerHTML = `<h6>F - Kontrola pociągu</h6>`;
-      if((currentReport.sectionF||[]).length===0) secFprint.innerHTML += `<div>-</div>`; else {
-        const t = document.createElement('table'); t.className='table-print';
-        t.innerHTML = `<thead><tr><th>Kontrolujący</th><th>Nr</th><th>Opis</th><th>Uwagi</th></tr></thead><tbody>${currentReport.sectionF.map(c=>`<tr><td>${safeText(c.by)}</td><td>${safeText(c.id)}</td><td>${safeText(c.desc)}</td><td>${safeText(c.notes)}</td></tr>`).join('')}</tbody>`;
-        secFprint.appendChild(t);
-      }
-      container.appendChild(secFprint);
-      // G
-      const secGprint = document.createElement('div'); secGprint.className='section'; secGprint.innerHTML = `<h6>G - Uwagi kierownika pociągu</h6>`;
-      if((currentReport.sectionG||[]).length===0) secGprint.innerHTML += `<div>-</div>`; else {
-        const ul = document.createElement('ul'); currentReport.sectionG.forEach(n=>{ const li = document.createElement('li'); li.textContent = n.text; ul.appendChild(li); }); secGprint.appendChild(ul);
-      }
-      container.appendChild(secGprint);
-
-      const footer = document.createElement('div'); footer.className='print-footer'; footer.textContent = `Wygenerowano dnia ${new Date().toLocaleString()} z systemu eRJ`;
-      container.appendChild(footer);
-
-      exportPdf(container, `${currentReport.number.replace(/\//g,'-')}.pdf`);
-    });
-
-    // initial render lists
-    renderReportHeader();
-    renderLists();
-  }
-
-  // expose helper for takeover to open report
-  window.openReportUI = openReportUI;
-
-  // initial refreshes
-  await refreshUsersTable();
-  await loadPhonebookFromGithub();
-});
+      tableE.innerHTML = `<thead><tr><th>Stacja</th><th>Przyj. (plan)</th><th>Przyj. (real)</th><th>Odch. przyj.</th><th>Odj. (plan)</th><th>Odj. (real)</th><th>Odch. odj.</th><th>Postój</th><th>Powód/Rozkazy</th></tr></thead><tbody>${(currentReport.sectionE||[]).length===0?`<tr><td colspan="9">-</td></tr>`: currentReport.sectionE.map(s=>{ const arrVal=(s.delayArrMinutes!=null)?`${s.delayArrMinutes} min`:'-'; const depVal=(s.delayDepMinutes!=null)?`${s.delayDepMinutes} min`:'-'; const stop=s.realStopMinutes!=null?`${s.realStopMinutes}`:'-'; const pow=(s.delayReason||'-')+(s.writtenOrders? ' / '+s.writtenOrders : ''); return `<tr><td>${safeText(s.station)}</td><td>${safeText(s.dateArr)} ${safeText(s.planArr)}</td><td>${safeText(s.dateArrReal)} ${safeText(s.realArr)}</td><td>${arrVal}</
