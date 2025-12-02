@@ -2,7 +2,7 @@
 const STORAGE_KEY_PREFIX = 'erj_report_';
 const COUNTER_KEY = 'erj_counter';
 const USERS_KEY = 'erj_users';
-const PHONEBOOK_KEY = 'erj_phonebook';
+const PHONEBOOK_KEY = 'erj_phonebook_local'; // local cache if needed
 
 export async function saveReport(report) {
   if (!report || !report.number) throw new Error('Brak numeru raportu');
@@ -89,26 +89,20 @@ export async function seedAdminIfMissing(admin) {
   return admin;
 }
 
-/* Phonebook */
-function _readPhonebook() {
+/* Phonebook local cache (app displays remote file from GitHub; local cache optional) */
+function _readPhonebookLocal() {
   const raw = localStorage.getItem(PHONEBOOK_KEY);
   if (!raw) return [];
   try { return JSON.parse(raw); } catch (e) { return []; }
 }
-function _writePhonebook(arr) {
+function _writePhonebookLocal(arr) {
   localStorage.setItem(PHONEBOOK_KEY, JSON.stringify(arr));
 }
 
-export async function listPhonebook() {
-  return _readPhonebook();
+export async function listPhonebookLocal() {
+  return _readPhonebookLocal();
 }
-export async function savePhonebookEntry(entry) {
-  const arr = _readPhonebook();
-  arr.push({ ...entry, createdAt: new Date().toISOString() });
-  _writePhonebook(arr);
-  return true;
-}
-export async function replacePhonebook(entries) {
-  _writePhonebook(entries || []);
+export async function replacePhonebookLocal(entries) {
+  _writePhonebookLocal(entries || []);
   return true;
 }
