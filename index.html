@@ -1,0 +1,227 @@
+<!doctype html>
+<html lang="pl">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>eRJ — eRegioJet System Drużyn Pociągowych</title>
+
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="css/styles.css" rel="stylesheet">
+  <link rel="manifest" href="/manifest.json">
+</head>
+<body>
+  <div class="container py-4" id="root">
+
+    <!-- LOGIN -->
+    <div id="loginView" class="card mx-auto" style="max-width:520px;">
+      <div class="card-body">
+        <h4 class="card-title mb-3">Zaloguj się do eRJ</h4>
+        <form id="loginForm" class="mb-2" autocomplete="on">
+          <div class="mb-2">
+            <label class="form-label small">Login (email lub numer służbowy)</label>
+            <input id="loginId" class="form-control" autocomplete="username" required>
+          </div>
+          <div class="mb-3">
+            <label class="form-label small">Hasło</label>
+            <input id="loginPassword" type="password" class="form-control" autocomplete="current-password" required>
+          </div>
+          <div class="d-flex gap-2">
+            <button id="loginBtn" type="submit" class="btn btn-primary">Zaloguj</button>
+            <button id="demoBtn" type="button" class="btn btn-outline-secondary">Demo (admin)</button>
+          </div>
+        </form>
+        <div id="loginMsg" class="text-danger small mt-2"></div>
+      </div>
+    </div>
+
+    <!-- APP -->
+    <div id="appShell" style="display:none;">
+      <div class="d-flex justify-content-between align-items-center mb-3">
+        <div>
+          <h3 class="mb-0">eRJ — eRegioJet System Drużyn Pociągowych</h3>
+          <div class="small text-muted" id="loggedUserInfo"></div>
+        </div>
+        <div class="d-flex gap-2 align-items-center">
+          <button id="btnLogout" type="button" class="btn btn-outline-danger btn-sm">Wyloguj</button>
+        </div>
+      </div>
+
+      <!-- DASHBOARD -->
+      <div id="dashboard" class="mb-3">
+        <div class="row g-3">
+          <div class="col-12 col-md-4">
+            <div class="card tile" id="tileHandleTrain" role="button" tabindex="0">
+              <div class="card-body text-center">
+                <h5>Obsłuż pociąg</h5>
+                <p class="small text-muted">Nowy raport, karta próby, wykaz R‑7</p>
+              </div>
+            </div>
+          </div>
+          <div class="col-12 col-md-4">
+            <div class="card tile" id="tileTakeOver" role="button" tabindex="0">
+              <div class="card-body text-center">
+                <h5>Przejmij pociąg</h5>
+                <p class="small text-muted">Przejmij dokumenty prowadzonego pociągu</p>
+              </div>
+            </div>
+          </div>
+          <div class="col-12 col-md-4">
+            <div class="card tile" id="tileAdmin" role="button" tabindex="0">
+              <div class="card-body text-center">
+                <h5>Administracja</h5>
+                <p class="small text-muted">Zarządzanie użytkownikami (tylko admin)</p>
+              </div>
+            </div>
+          </div>
+
+          <div class="col-12 col-md-4">
+            <div class="card tile-link" id="tileRegiojet">
+              <div class="card-body text-center">
+                <h5>Strona RegioJet</h5>
+                <a class="stretched-link" href="https://regiojet.pl/" target="_blank" rel="noopener">Otwórz</a>
+              </div>
+            </div>
+          </div>
+          <div class="col-12 col-md-4">
+            <div class="card tile-link" id="tilePortalPL">
+              <div class="card-body text-center">
+                <h5>Portal pasażera PL</h5>
+                <a class="stretched-link" href="https://portalpasazera.pl/" target="_blank" rel="noopener">Otwórz</a>
+              </div>
+            </div>
+          </div>
+          <div class="col-12 col-md-4">
+            <div class="card tile-link" id="tilePortalCZ">
+              <div class="card-body text-center">
+                <h5>Portal pasażera CZ</h5>
+                <a class="stretched-link" href="https://www.spravazeleznic.cz/cestujici" target="_blank" rel="noopener">Otwórz</a>
+              </div>
+            </div>
+          </div>
+
+          <div class="col-12">
+            <div class="card tile" id="tilePhonebook" role="button" tabindex="0">
+              <div class="card-body text-center">
+                <h5>Książka telefoniczna</h5>
+                <p class="small text-muted">Import/eksport numerów służbowych (CSV/Excel)</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- HANDLE TRAIN MENU -->
+      <div id="handleTrainMenu" style="display:none;">
+        <div class="card p-3 mb-3">
+          <div class="d-flex justify-content-between align-items-center">
+            <h5>Obsłuż pociąg</h5>
+            <button id="backFromHandle" class="btn btn-sm btn-outline-secondary">Powrót</button>
+          </div>
+          <hr>
+          <div class="d-flex gap-2 flex-wrap">
+            <button id="btnNewReport" class="btn btn-primary">Nowy raport z jazdy</button>
+            <button id="btnNewBrake" class="btn btn-secondary disabled" disabled>Nowa karta próby hamulca (nieaktywna)</button>
+            <button id="btnNewR7" class="btn btn-secondary disabled" disabled>Nowy wykaz pojazdów R‑7 (nieaktywne)</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- TAKE OVER MENU -->
+      <div id="takeOverMenu" style="display:none;">
+        <div class="card p-3 mb-3">
+          <div class="d-flex justify-content-between align-items-center">
+            <h5>Przejmij pociąg</h5>
+            <button id="backFromTakeover" class="btn btn-sm btn-outline-secondary">Powrót</button>
+          </div>
+          <hr>
+          <form id="takeoverForm" class="row g-2">
+            <div class="col-12 col-md-6">
+              <label class="form-label small">Numer pociągu</label>
+              <input id="takeoverTrainNumber" class="form-control" placeholder="np. 010" required>
+            </div>
+            <div class="col-12 col-md-6">
+              <label class="form-label small">Data rozpoczęcia obsługi</label>
+              <input id="takeoverDate" type="date" class="form-control" required>
+            </div>
+            <div class="col-12">
+              <button type="submit" class="btn btn-primary">Przejmij dokumenty</button>
+            </div>
+            <div class="col-12"><div id="takeoverMsg" class="small text-danger"></div></div>
+          </form>
+        </div>
+      </div>
+
+      <!-- ADMIN PANEL (reused) -->
+      <div id="adminPanel" class="card p-3 mb-3" style="display:none;">
+        <div class="d-flex justify-content-between align-items-center">
+          <h5 class="mb-0">Panel administracyjny</h5>
+          <button id="addUserBtn" type="button" class="btn btn-sm btn-primary" data-bs-toggle="modal" data-bs-target="#modalUser">Dodaj użytkownika</button>
+        </div>
+        <hr>
+        <div id="usersTableContainer" class="table-responsive">
+          <table class="table table-sm table-hover" id="usersTable">
+            <thead class="table-light"><tr><th>Imię i nazwisko</th><th>Nr służbowy</th><th>ZDP</th><th>Email</th><th>Rola</th><th>Status</th><th>Akcje</th></tr></thead>
+            <tbody></tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- PHONEBOOK -->
+      <div id="phonebookPanel" class="card p-3 mb-3" style="display:none;">
+        <div class="d-flex justify-content-between align-items-center">
+          <h5 class="mb-0">Książka telefoniczna</h5>
+          <div>
+            <input id="phoneImportFile" type="file" accept=".csv" style="display:none;">
+            <button id="btnImportPhone" class="btn btn-sm btn-outline-primary">Importuj CSV</button>
+            <button id="btnExportPhone" class="btn btn-sm btn-outline-secondary">Eksportuj CSV</button>
+          </div>
+        </div>
+        <hr>
+        <div class="table-responsive">
+          <table class="table table-sm" id="phonebookTable">
+            <thead><tr><th>Nazwa</th><th>Rola</th><th>Numer</th><th>Godziny</th><th>Akcje</th></tr></thead>
+            <tbody></tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- REPORT PANEL (reused existing report UI) -->
+      <div id="reportPanelContainer" style="display:none;"></div>
+
+      <!-- Modale: User -->
+      <div class="modal fade" id="modalUser" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog">
+          <form id="formUser" class="modal-content" data-mode="add" data-index="">
+            <div class="modal-header"><h5 class="modal-title">Dodaj użytkownika</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+            <div class="modal-body">
+              <div class="mb-2"><label class="form-label">Imię i nazwisko</label><input id="u_name" class="form-control" required></div>
+              <div class="mb-2"><label class="form-label">Numer służbowy</label><input id="u_id" class="form-control" required></div>
+              <div class="mb-2"><label class="form-label">ZDP</label><select id="u_zdp" class="form-select"><option>WAW</option><option>KRK</option><option>GDY</option><option>POZ</option></select></div>
+              <div class="mb-2"><label class="form-label">Email</label><input id="u_email" type="email" class="form-control" required></div>
+              <div class="mb-2"><label class="form-label">Hasło</label><input id="u_password" type="password" class="form-control" required></div>
+              <div class="mb-2"><label class="form-label">Rola</label><select id="u_role" class="form-select"><option value="user">Użytkownik</option><option value="admin">Administrator</option></select></div>
+              <div class="mb-2"><label class="form-label">Status</label><select id="u_status" class="form-select"><option value="active">Aktywny</option><option value="inactive">Nieaktywny</option></select></div>
+              <div id="userFormMsg" class="small text-danger"></div>
+            </div>
+            <div class="modal-footer"><button type="submit" class="btn btn-primary">Zapisz</button><button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Anuluj</button></div>
+          </form>
+        </div>
+      </div>
+
+      <!-- Footer -->
+      <footer class="mt-4 mb-2 text-center small text-muted">
+        Stworzone z pomocą sztucznej inteligencji Copilot przez Paweł Klawiński v0.1
+      </footer>
+    </div>
+  </div>
+
+  <!-- scripts -->
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.9.3/html2pdf.bundle.min.js"></script>
+
+  <script type="module" src="js/db.js"></script>
+  <script type="module" src="js/auth.js"></script>
+  <script type="module" src="js/pdf.js"></script>
+  <script type="module" src="js/app.js"></script>
+</body>
+</html>
