@@ -20,38 +20,102 @@ export async function exportPdf(elementOrHtml, filename = 'document.pdf') {
   return html2pdf().set(opt).from(node).save();
 }
 
-/* Buduje PDF w układzie zgodnym z załączonym wzorem R-7 (uproszczony, czytelny) */
+/* Buduje PDF w układzie zbliżonym do oficjalnego formularza R-7.
+   Generuje 42 wiersze numerowane 1..42 oraz H1..H3 (tak jak w wzorze). */
 export async function exportR7Pdf(report, filename = 'R7.pdf') {
   const meta = report.r7Meta || {};
-  const rows = (report.r7List || []).map((v, i) => {
-    return `<tr>
-      <td style="border:1px solid #333; padding:4px; text-align:center;">${i+1}</td>
-      <td style="border:1px solid #333; padding:4px;">${escapeHtml(v.evn)}</td>
-      <td style="border:1px solid #333; padding:4px; text-align:center;">${escapeHtml(v.country)}</td>
-      <td style="border:1px solid #333; padding:4px; text-align:center;">${escapeHtml(v.operator)}</td>
-      <td style="border:1px solid #333; padding:4px;">${escapeHtml(v.series)}</td>
-      <td style="border:1px solid #333; padding:4px; text-align:center;">${escapeHtml(v.operator_code)}</td>
-      <td style="border:1px solid #333; padding:4px; text-align:right;">${v.length!=null?v.length:''}</td>
-      <td style="border:1px solid #333; padding:4px; text-align:right;">${v.payload!=null?v.payload:''}</td>
-      <td style="border:1px solid #333; padding:4px; text-align:right;">${v.empty_mass!=null?v.empty_mass:''}</td>
-      <td style="border:1px solid #333; padding:4px; text-align:right;">${v.brake_mass!=null?v.brake_mass:''}</td>
-      <td style="border:1px solid #333; padding:4px;">${escapeHtml(v.from)}</td>
-      <td style="border:1px solid #333; padding:4px;">${escapeHtml(v.to)}</td>
-      <td style="border:1px solid #333; padding:4px;">${escapeHtml(v.notes)}</td>
-    </tr>`;
-  }).join('\n');
+  const rowsData = report.r7List || [];
 
-  // Podsumowanie analizy (jeśli jest)
+  // Build rows: 1..42 then H1..H3
+  const numericRows = Array.from({length:42}, (_,i)=>i+1);
+  const headerRows = ['H1','H2','H3'];
+
+  // Helper to get row data or empty
+  function rowHtmlForIndex(i) {
+    const v = rowsData[i-1];
+    if (!v) {
+      return `<tr>
+        <td style="border:1px solid #333; padding:6px; text-align:center;">${i}</td>
+        <td style="border:1px solid #333; padding:6px;"></td><td style="border:1px solid #333; padding:6px;"></td><td style="border:1px solid #333; padding:6px;"></td>
+        <td style="border:1px solid #333; padding:6px;"></td><td style="border:1px solid #333; padding:6px;"></td>
+        <td style="border:1px solid #333; padding:6px;"></td><td style="border:1px solid #333; padding:6px;"></td>
+        <td style="border:1px solid #333; padding:6px;"></td><td style="border:1px solid #333; padding:6px;"></td>
+        <td style="border:1px solid #333; padding:6px;"></td><td style="border:1px solid #333; padding:6px;"></td>
+        <td style="border:1px solid #333; padding:6px;"></td>
+      </tr>`;
+    } else {
+      return `<tr>
+        <td style="border:1px solid #333; padding:6px; text-align:center;">${i}</td>
+        <td style="border:1px solid #333; padding:6px;">${escapeHtml(v.evn)}</td>
+        <td style="border:1px solid #333; padding:6px; text-align:center;">${escapeHtml(v.country)}</td>
+        <td style="border:1px solid #333; padding:6px; text-align:center;">${escapeHtml(v.operator)}</td>
+        <td style="border:1px solid #333; padding:6px;">${escapeHtml(v.series)}</td>
+        <td style="border:1px solid #333; padding:6px; text-align:center;">${escapeHtml(v.operator_code)}</td>
+        <td style="border:1px solid #333; padding:6px; text-align:right;">${v.length!=null?v.length:''}</td>
+        <td style="border:1px solid #333; padding:6px; text-align:right;">${v.payload!=null?v.payload:''}</td>
+        <td style="border:1px solid #333; padding:6px; text-align:right;">${v.empty_mass!=null?v.empty_mass:''}</td>
+        <td style="border:1px solid #333; padding:6px; text-align:right;">${v.brake_mass!=null?v.brake_mass:''}</td>
+        <td style="border:1px solid #333; padding:6px;">${escapeHtml(v.from)}</td>
+        <td style="border:1px solid #333; padding:6px;">${escapeHtml(v.to)}</td>
+        <td style="border:1px solid #333; padding:6px;">${escapeHtml(v.notes)}</td>
+      </tr>`;
+    }
+  }
+
+  // H rows
+  function headerRowHtml(label, idx) {
+    const v = rowsData[42 + idx];
+    if (!v) {
+      return `<tr>
+        <td style="border:1px solid #333; padding:6px; text-align:center;">${label}</td>
+        <td style="border:1px solid #333; padding:6px;"></td><td style="border:1px solid #333; padding:6px;"></td><td style="border:1px solid #333; padding:6px;"></td>
+        <td style="border:1px solid #333; padding:6px;"></td><td style="border:1px solid #333; padding:6px;"></td>
+        <td style="border:1px solid #333; padding:6px;"></td><td style="border:1px solid #333; padding:6px;"></td>
+        <td style="border:1px solid #333; padding:6px;"></td><td style="border:1px solid #333; padding:6px;"></td>
+        <td style="border:1px solid #333; padding:6px;"></td><td style="border:1px solid #333; padding:6px;"></td>
+        <td style="border:1px solid #333; padding:6px;"></td>
+      </tr>`;
+    } else {
+      return `<tr>
+        <td style="border:1px solid #333; padding:6px; text-align:center;">${label}</td>
+        <td style="border:1px solid #333; padding:6px;">${escapeHtml(v.evn)}</td>
+        <td style="border:1px solid #333; padding:6px; text-align:center;">${escapeHtml(v.country)}</td>
+        <td style="border:1px solid #333; padding:6px; text-align:center;">${escapeHtml(v.operator)}</td>
+        <td style="border:1px solid #333; padding:6px;">${escapeHtml(v.series)}</td>
+        <td style="border:1px solid #333; padding:6px; text-align:center;">${escapeHtml(v.operator_code)}</td>
+        <td style="border:1px solid #333; padding:6px; text-align:right;">${v.length!=null?v.length:''}</td>
+        <td style="border:1px solid #333; padding:6px; text-align:right;">${v.payload!=null?v.payload:''}</td>
+        <td style="border:1px solid #333; padding:6px; text-align:right;">${v.empty_mass!=null?v.empty_mass:''}</td>
+        <td style="border:1px solid #333; padding:6px; text-align:right;">${v.brake_mass!=null?v.brake_mass:''}</td>
+        <td style="border:1px solid #333; padding:6px;">${escapeHtml(v.from)}</td>
+        <td style="border:1px solid #333; padding:6px;">${escapeHtml(v.to)}</td>
+        <td style="border:1px solid #333; padding:6px;">${escapeHtml(v.notes)}</td>
+      </tr>`;
+    }
+  }
+
+  // Build rows HTML
+  const rowsHtml = numericRows.map(i => rowHtmlForIndex(i)).join('\n') +
+    headerRows.map((h, idx) => headerRowHtml(h, idx)).join('\n');
+
   const analysis = report._analysis || {};
+
   const html = `
-  <div style="font-family: Arial, Helvetica, sans-serif; font-size:12px; padding:10px;">
-    <h3 style="text-align:center; margin-bottom:6px;">Wykaz pojazdów kolejowych w składzie pociągu (R-7)</h3>
-    <table style="width:100%; border-collapse:collapse; margin-bottom:8px;">
+  <div style="font-family: Arial, Helvetica, sans-serif; font-size:11px; padding:8px;">
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
+      <div style="font-weight:700; font-size:14px;">Wykaz pojazdów kolejowych w składzie pociągu (R-7)</div>
+      <div style="text-align:right; font-size:11px; color:#444;">
+        <div>Nr raportu: ${escapeHtml(report.number||'')}</div>
+        <div>Data wydruku: ${new Date().toLocaleString()}</div>
+      </div>
+    </div>
+
+    <table style="width:100%; border-collapse:collapse; margin-bottom:8px; font-size:11px;">
       <tr>
-        <td style="width:25%"><strong>Nr pociągu:</strong> ${escapeHtml(report.sectionA?.trainNumber||'')}</td>
-        <td style="width:25%"><strong>Wyprawiony dnia:</strong> ${escapeHtml(report.sectionA?.date||'')}</td>
-        <td style="width:25%"><strong>Ze stacji:</strong> ${escapeHtml(meta.from||'')}</td>
-        <td style="width:25%"><strong>Do stacji:</strong> ${escapeHtml(meta.to||'')}</td>
+        <td style="width:25%;"><strong>Nr pociągu:</strong> ${escapeHtml(report.sectionA?.trainNumber||'')}</td>
+        <td style="width:25%;"><strong>Wyprawiony dnia:</strong> ${escapeHtml(report.sectionA?.date||'')}</td>
+        <td style="width:25%;"><strong>Ze stacji:</strong> ${escapeHtml(meta.from||'')}</td>
+        <td style="width:25%;"><strong>Do stacji:</strong> ${escapeHtml(meta.to||'')}</td>
       </tr>
       <tr>
         <td><strong>Maszynista:</strong> ${escapeHtml(meta.driver||'')}</td>
@@ -59,30 +123,30 @@ export async function exportR7Pdf(report, filename = 'R7.pdf') {
       </tr>
     </table>
 
-    <table style="width:100%; border-collapse:collapse; margin-bottom:8px;">
+    <table style="width:100%; border-collapse:collapse; font-size:10px;">
       <thead>
         <tr style="background:#f0f0f0;">
-          <th style="border:1px solid #333; padding:4px;">Lp.</th>
-          <th style="border:1px solid #333; padding:4px;">EVN / ID</th>
-          <th style="border:1px solid #333; padding:4px;">Państwo</th>
-          <th style="border:1px solid #333; padding:4px;">Ekspl.</th>
-          <th style="border:1px solid #333; padding:4px;">Typ/seria</th>
-          <th style="border:1px solid #333; padding:4px;">Kod</th>
-          <th style="border:1px solid #333; padding:4px;">Długość (m)</th>
-          <th style="border:1px solid #333; padding:4px;">Masa ład. (t)</th>
-          <th style="border:1px solid #333; padding:4px;">Masa własna (t)</th>
-          <th style="border:1px solid #333; padding:4px;">Masa ham. (t)</th>
-          <th style="border:1px solid #333; padding:4px;">Stacja nadania</th>
-          <th style="border:1px solid #333; padding:4px;">Stacja przezn.</th>
-          <th style="border:1px solid #333; padding:4px;">Uwagi</th>
+          <th style="border:1px solid #333; padding:6px; width:3%;">Lp.</th>
+          <th style="border:1px solid #333; padding:6px; width:12%;">Numer inw.</th>
+          <th style="border:1px solid #333; padding:6px; width:5%;">Państwo</th>
+          <th style="border:1px solid #333; padding:6px; width:6%;">Ekspl.</th>
+          <th style="border:1px solid #333; padding:6px; width:12%;">Typ/seria</th>
+          <th style="border:1px solid #333; padding:6px; width:5%;">Kod</th>
+          <th style="border:1px solid #333; padding:6px; width:6%;">Długość (m)</th>
+          <th style="border:1px solid #333; padding:6px; width:6%;">Masa ład. (t)</th>
+          <th style="border:1px solid #333; padding:6px; width:6%;">Masa własna (t)</th>
+          <th style="border:1px solid #333; padding:6px; width:6%;">Masa ham. (t)</th>
+          <th style="border:1px solid #333; padding:6px; width:8%;">Stacja nadania</th>
+          <th style="border:1px solid #333; padding:6px; width:8%;">Stacja przezn.</th>
+          <th style="border:1px solid #333; padding:6px; width:13%;">Uwagi</th>
         </tr>
       </thead>
       <tbody>
-        ${rows}
+        ${rowsHtml}
       </tbody>
     </table>
 
-    <div style="margin-top:10px;">
+    <div style="margin-top:8px; font-size:11px;">
       <strong>Podsumowanie analizy:</strong>
       <div>Długość składu: ${analysis.length ?? '-'} m</div>
       <div>Masa składu (wagony): ${analysis.massWagons ?? '-'} t</div>
