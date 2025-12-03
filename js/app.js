@@ -166,9 +166,39 @@ document.addEventListener('DOMContentLoaded', async () => {
     openReportUI(report);
   });
 
-  // New brake and R7 buttons intentionally disabled in handleTrainMenu (UI only)
-  btnNewBrake && btnNewBrake.addEventListener('click', ()=>{ /* disabled */ });
-  btnNewR7 && btnNewR7.addEventListener('click', ()=>{ /* disabled */ });
+  // New R7: utwórz nowy raport z pustym wykazem i otwórz panel R7
+  btnNewR7 && btnNewR7.addEventListener('click', async ()=> {
+    const u = currentUser();
+    const name = u?.name || '';
+    const id = u?.id || '';
+    if(!name || !id) return alert('Brak danych prowadzącego. Uzupełnij profil.');
+    const c = await nextCounter();
+    const d = new Date();
+    const DD = String(d.getDate()).padStart(2,'0');
+    const MM = String(d.getMonth()+1).padStart(2,'0');
+    const YY = String(d.getFullYear()).slice(-2);
+    const XXX = String(c).padStart(3,'0');
+    const number = `R7-${XXX}-${DD}${MM}${YY}`;
+    const report = {
+      number,
+      createdAt: new Date().toISOString(),
+      createdBy: { name, id },
+      currentDriver: { name, id },
+      sectionA: { category:'', traction:'', trainNumber:'', route:'', date: d.toISOString().slice(0,10) },
+      sectionB:[], sectionC:[], sectionD:[], sectionE:[], sectionF:[], sectionG:[], r7List:[], r7Meta:{}, brakeTests:[], history:[]
+    };
+    await saveReport(report);
+    // open R7 panel directly and set currentReport
+    currentReport = report;
+    dashboard.style.display='none';
+    handleTrainMenu.style.display='none';
+    reportPanelContainer.style.display='none';
+    if(r7Panel) r7Panel.style.display='block';
+    // populate general fields
+    qs('r7_trainNumber') && (qs('r7_trainNumber').value = report.sectionA.trainNumber || '');
+    qs('r7_date') && (qs('r7_date').value = report.sectionA.date || '');
+    renderR7List(report);
+  });
 
   /* ---------- Admin users table ---------- */
   async function refreshUsersTable(){
@@ -184,8 +214,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   }
 
   formUser && formUser.addEventListener('submit', async (e)=>{ 
-    e.preventDefault(); 
-    userFormMsg.textContent=''; 
+    e.preventDefault(); userFormMsg.textContent=''; 
     const mode=formUser.getAttribute('data-mode')||'add'; 
     const idx=formUser.getAttribute('data-index')||''; 
     const name=qs('u_name').value.trim(); 
@@ -243,15 +272,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       }
     }
   }
-
-  function renderPhonebook(entries) {
-    phonebookTableBody.innerHTML = '';
-    entries.forEach(e => {
-      const tr = document.createElement('tr');
-      tr.innerHTML = `<td>${safeText(e.name)}</td><td>${safeText(e.role)}</td><td><a href="tel:${encodeURIComponent(e.number)}">${safeText(e.number)}</a></td><td>${safeText(e.hours)}</td>`;
-      phonebookTableBody.appendChild(tr);
-    });
-  }
+  function renderPhonebook(entries) { phonebookTableBody.innerHTML = ''; entries.forEach(e => { const tr = document.createElement('tr'); tr.innerHTML = `<td>${safeText(e.name)}</td><td>${safeText(e.role)}</td><td><a href="tel:${encodeURIComponent(e.number)}">${safeText(e.number)}</a></td><td>${safeText(e.hours)}</td>`; phonebookTableBody.appendChild(tr); }); }
 
   /* ---------- Report state and helpers ---------- */
   let currentReport = null;
@@ -264,16 +285,9 @@ document.addEventListener('DOMContentLoaded', async () => {
   }
 
   /* ---------- Full Report UI: modals and lists ---------- */
-  // We'll create modals in HTML; here implement rendering and handlers for sections B-G and modals.
-  // For brevity and reliability we implement full handlers for modals used earlier: traction, conductor, order, station, control, note.
-  // The HTML must contain modals with ids: modalTraction, formTraction, modalConductor, formConductor, modalOrder, formOrder, modalStation, formStation, modalControl, formControl, modalNote, formNote.
-  // If your index.html uses different ids, adapt selectors accordingly.
-
   function renderLists() {
-    // Render lists for sections B-G if currentReport exists
     if(!currentReport) return;
 
-    // Helper to render list container
     function renderList(containerId, arr, renderer) {
       const container = qs(containerId);
       if(!container) return;
@@ -611,7 +625,9 @@ document.addEventListener('DOMContentLoaded', async () => {
       currentReport.r7List.push(v);
     }
     await saveReport(currentReport);
-    new bootstrap.Modal(modalR7Vehicle).hide();
+    // close modal using bootstrap API to ensure X and Anuluj work
+    const bs = bootstrap.Modal.getInstance(modalR7Vehicle);
+    bs && bs.hide();
     renderR7List(currentReport);
   });
 
@@ -674,7 +690,6 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     const card = el('div','card p-3 mb-3');
 
-    // header
     const header = el('div','d-flex justify-content-between align-items-center mb-2');
     header.innerHTML = `<div><h5 class="mb-0">Raport z jazdy pociągu</h5><div class="small text-muted">Numer: <strong id="rp_number">${safeText(report.number)}</strong></div></div>
       <div class="text-end"><div class="small text-muted" id="rp_user">${safeText(report.currentDriver?.name || report.createdBy?.name)} (${safeText(report.currentDriver?.id || report.createdBy?.id)})</div>
@@ -822,14 +837,12 @@ document.addEventListener('DOMContentLoaded', async () => {
     });
 
     btnPreviewPdf.addEventListener('click', async ()=> {
-      // Build a printable container for the full report (A-G)
       const container = document.createElement('div');
       container.className = 'print-container';
       const header = document.createElement('div');
       header.className = 'print-header';
       header.innerHTML = `<div class="print-title">Raport z jazdy pociągu</div><div class="print-meta">Numer: ${currentReport.number} · Prowadzący: ${currentReport.currentDriver?.name || currentReport.createdBy?.name} (${currentReport.currentDriver?.id || currentReport.createdBy?.id})</div><div class="print-meta">Wygenerowano dnia ${new Date().toLocaleString()}</div>`;
       container.appendChild(header);
-      // Section A
       const secAprint = document.createElement('div');
       secAprint.innerHTML = `<h6>A - Dane ogólne</h6><table class="table-print"><tbody>
         <tr><th>Kategoria</th><td>${safeText(currentReport.sectionA.category)}</td></tr>
@@ -839,8 +852,6 @@ document.addEventListener('DOMContentLoaded', async () => {
         <tr><th>Data kursu</th><td>${safeText(currentReport.sectionA.date)}</td></tr>
       </tbody></table>`;
       container.appendChild(secAprint);
-      // B-G simplified printing (similar to earlier exportPdf logic)
-      // B
       const makeCrewTable = (title, arr, cols) => {
         const s = document.createElement('div'); s.className='section';
         s.innerHTML = `<h6>${title}</h6>`;
@@ -854,7 +865,6 @@ document.addEventListener('DOMContentLoaded', async () => {
       };
       container.appendChild(makeCrewTable('B - Drużyna trakcyjna', currentReport.sectionB, ['name','id','zdp','loco','from','to']));
       container.appendChild(makeCrewTable('C - Drużyna konduktorska', currentReport.sectionC, ['name','id','zdp','role','from','to']));
-      // D
       const secDprint = document.createElement('div'); secDprint.className = 'section'; secDprint.innerHTML = `<h6>D - Dyspozycje</h6>`;
       if((currentReport.sectionD||[]).length===0) secDprint.innerHTML += `<div>-</div>`; else {
         const t = document.createElement('table'); t.className='table-print';
@@ -862,12 +872,10 @@ document.addEventListener('DOMContentLoaded', async () => {
         secDprint.appendChild(t);
       }
       container.appendChild(secDprint);
-      // E
       const secEprint = document.createElement('div'); secEprint.className='section'; secEprint.innerHTML = `<h6>E - Dane o jeździe pociągu</h6>`;
       const tableE = document.createElement('table'); tableE.className='table-print';
       tableE.innerHTML = `<thead><tr><th>Stacja</th><th>Przyj. (plan)</th><th>Przyj. (real)</th><th>Odch. przyj.</th><th>Odj. (plan)</th><th>Odj. (real)</th><th>Odch. odj.</th><th>Postój</th><th>Powód/Rozkazy</th></tr></thead><tbody>${(currentReport.sectionE||[]).length===0?`<tr><td colspan="9">-</td></tr>`: currentReport.sectionE.map(s=>{ const arrVal=(s.delayArrMinutes!=null)?`${s.delayArrMinutes} min`:'-'; const depVal=(s.delayDepMinutes!=null)?`${s.delayDepMinutes} min`:'-'; const stop=s.realStopMinutes!=null?`${s.realStopMinutes}`:'-'; const pow=(s.delayReason||'-')+(s.writtenOrders? ' / '+s.writtenOrders : ''); return `<tr><td>${safeText(s.station)}</td><td>${safeText(s.dateArr)} ${safeText(s.planArr)}</td><td>${safeText(s.dateArrReal)} ${safeText(s.realArr)}</td><td>${arrVal}</td><td>${safeText(s.dateDep)} ${safeText(s.planDep)}</td><td>${safeText(s.dateDepReal)} ${safeText(s.realDep)}</td><td>${depVal}</td><td>${stop}</td><td>${pow}</td></tr>`; }).join('')}</tbody>`;
       secEprint.appendChild(tableE); container.appendChild(secEprint);
-      // F
       const secFprint = document.createElement('div'); secFprint.className='section'; secFprint.innerHTML = `<h6>F - Kontrola pociągu</h6>`;
       if((currentReport.sectionF||[]).length===0) secFprint.innerHTML += `<div>-</div>`; else {
         const t = document.createElement('table'); t.className='table-print';
@@ -875,7 +883,6 @@ document.addEventListener('DOMContentLoaded', async () => {
         secFprint.appendChild(t);
       }
       container.appendChild(secFprint);
-      // G
       const secGprint = document.createElement('div'); secGprint.className='section'; secGprint.innerHTML = `<h6>G - Uwagi kierownika pociągu</h6>`;
       if((currentReport.sectionG||[]).length===0) secGprint.innerHTML += `<div>-</div>`; else {
         const ul = document.createElement('ul'); currentReport.sectionG.forEach(n=>{ const li = document.createElement('li'); li.textContent = n.text; ul.appendChild(li); }); secGprint.appendChild(ul);
