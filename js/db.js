@@ -1,108 +1,92 @@
 // js/db.js
-const STORAGE_KEY_PREFIX = 'erj_report_';
-const COUNTER_KEY = 'erj_counter';
-const USERS_KEY = 'erj_users';
-const PHONEBOOK_KEY = 'erj_phonebook_local'; // local cache if needed
+// Prosty lokalny "DB" oparty na localStorage.
+// Przeznaczony do środowiska deweloperskiego / demo.
+
+const LS_USERS = 'erj_users_v1';
+const LS_REPORTS = 'erj_reports_v1';
+const LS_PHONEBOOK = 'erj_phonebook_v1';
+const LS_COUNTER = 'erj_counter_v1';
+
+function read(key, def) {
+  try {
+    const v = localStorage.getItem(key);
+    return v ? JSON.parse(v) : def;
+  } catch (e) {
+    return def;
+  }
+}
+function write(key, val) {
+  localStorage.setItem(key, JSON.stringify(val));
+}
+
+/* ---------- Users ---------- */
+export async function listUsers() {
+  return read(LS_USERS, []);
+}
+
+export async function getUserByEmailOrId(key) {
+  const users = read(LS_USERS, []);
+  return users.find(u => (u.email && u.email === key) || (u.id && u.id === key)) || null;
+}
+
+/*
+  registerUser - zapisuje metadane użytkownika.
+  Uwaga: hasła są przechowywane w auth.js (oddzielnie).
+*/
+export async function registerUser({ name, id, zdp, email, role, status }) {
+  const users = read(LS_USERS, []);
+  if (users.find(u => u.email === email || u.id === id)) throw new Error('Użytkownik już istnieje');
+  users.push({ name, id, zdp, email, role: role || 'user', status: status || 'active' });
+  write(LS_USERS, users);
+  return true;
+}
+
+export async function updateUser(key, patch) {
+  const users = read(LS_USERS, []);
+  const idx = users.findIndex(u => (u.email && u.email === key) || (u.id && u.id === key));
+  if (idx === -1) throw new Error('Nie znaleziono użytkownika');
+  users[idx] = { ...users[idx], ...patch };
+  write(LS_USERS, users);
+  return users[idx];
+}
+
+export async function deleteUser(key) {
+  let users = read(LS_USERS, []);
+  users = users.filter(u => !((u.email && u.email === key) || (u.id && u.id === key)));
+  write(LS_USERS, users);
+  return true;
+}
+
+/* ---------- Reports ---------- */
+export async function listReports() {
+  return read(LS_REPORTS, []);
+}
 
 export async function saveReport(report) {
-  if (!report || !report.number) throw new Error('Brak numeru raportu');
-  localStorage.setItem(STORAGE_KEY_PREFIX + report.number, JSON.stringify(report));
-  return true;
+  const reports = read(LS_REPORTS, []);
+  const idx = reports.findIndex(r => r.number === report.number);
+  if (idx === -1) reports.push(report); else reports[idx] = report;
+  write(LS_REPORTS, reports);
+  return report;
 }
 
 export async function getReport(number) {
-  const raw = localStorage.getItem(STORAGE_KEY_PREFIX + number);
-  if (!raw) return null;
-  try { return JSON.parse(raw); } catch (e) { return null; }
-}
-
-export async function listReports() {
-  const keys = Object.keys(localStorage).filter(k => k.startsWith(STORAGE_KEY_PREFIX));
-  return keys.map(k => {
-    try { return JSON.parse(localStorage.getItem(k)); } catch(e){ return null; }
-  }).filter(Boolean);
+  const reports = read(LS_REPORTS, []);
+  return reports.find(r => r.number === number) || null;
 }
 
 export async function nextCounter() {
-  const raw = localStorage.getItem(COUNTER_KEY);
-  let n = raw ? Number(raw) : 0;
-  n = (isNaN(n) ? 0 : n) + 1;
-  localStorage.setItem(COUNTER_KEY, String(n));
-  return n;
+  const c = read(LS_COUNTER, 0) + 1;
+  write(LS_COUNTER, c);
+  return c;
 }
 
-/* Users API */
-function _readUsers() {
-  const raw = localStorage.getItem(USERS_KEY);
-  if (!raw) return [];
-  try { return JSON.parse(raw); } catch (e) { return []; }
-}
-function _writeUsers(arr) {
-  localStorage.setItem(USERS_KEY, JSON.stringify(arr));
-}
-
-export async function listUsers() {
-  return _readUsers();
-}
-
-export async function saveUser(user) {
-  if (!user || (!user.email && !user.id)) throw new Error('Nieprawidłowe dane użytkownika');
-  const arr = _readUsers();
-  const idx = arr.findIndex(u => (u.email && u.email.toLowerCase() === (user.email||'').toLowerCase()) || (u.id && String(u.id) === String(user.id)));
-  if (idx >= 0) { arr[idx] = { ...arr[idx], ...user, updatedAt: new Date().toISOString() }; }
-  else { arr.push({ ...user, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() }); }
-  _writeUsers(arr);
-  return true;
-}
-
-export async function getUserByEmailOrId(login) {
-  if (!login) return null;
-  const arr = _readUsers();
-  return arr.find(u => (u.email && u.email.toLowerCase() === (login||'').toLowerCase()) || (u.id && String(u.id) === String(login))) || null;
-}
-
-export async function updateUser(emailOrId, patch) {
-  const arr = _readUsers();
-  const idx = arr.findIndex(u => (u.email && u.email.toLowerCase() === (emailOrId||'').toLowerCase()) || (u.id && String(u.id) === String(emailOrId)));
-  if (idx < 0) throw new Error('Nie znaleziono użytkownika');
-  arr[idx] = { ...arr[idx], ...patch, updatedAt: new Date().toISOString() };
-  _writeUsers(arr);
-  return arr[idx];
-}
-
-export async function deleteUser(emailOrId) {
-  const arr = _readUsers();
-  const idx = arr.findIndex(u => (u.email && u.email.toLowerCase() === (emailOrId||'').toLowerCase()) || (u.id && String(u.id) === String(emailOrId)));
-  if (idx < 0) throw new Error('Nie znaleziono użytkownika');
-  arr.splice(idx,1);
-  _writeUsers(arr);
-  return true;
-}
-
-export async function seedAdminIfMissing(admin) {
-  if (!admin || !admin.email) return;
-  const existing = await getUserByEmailOrId(admin.email);
-  if (existing) return existing;
-  const arr = _readUsers();
-  arr.push({ ...admin, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() });
-  _writeUsers(arr);
-  return admin;
-}
-
-/* Phonebook local cache (app displays remote file from GitHub; local cache optional) */
-function _readPhonebookLocal() {
-  const raw = localStorage.getItem(PHONEBOOK_KEY);
-  if (!raw) return [];
-  try { return JSON.parse(raw); } catch (e) { return []; }
-}
-function _writePhonebookLocal(arr) {
-  localStorage.setItem(PHONEBOOK_KEY, JSON.stringify(arr));
-}
-
+/* ---------- Phonebook (local cache) ---------- */
 export async function listPhonebookLocal() {
-  return _readPhonebookLocal();
+  return read(LS_PHONEBOOK, []);
 }
+
 export async function replacePhonebookLocal(entries) {
-  _writePhonebookLocal(entries || []);
-  return true;
+  write(LS_PHONEBOOK, entries);
+  return entries;
 }
