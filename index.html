@@ -8,6 +8,20 @@
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
   <link href="css/styles.css" rel="stylesheet">
   <link rel="manifest" href="/manifest.json">
+  <style>
+    /* Minimal styles to keep layout readable */
+    .tile { cursor: pointer; }
+    .tile:hover { box-shadow: 0 2px 8px rgba(0,0,0,0.08); transform: translateY(-2px); transition: .12s; }
+    .station-row { padding: .5rem 0; border-bottom: 1px dashed #e9ecef; }
+    .list-group-item { user-select: none; }
+    .dragging { opacity: .6; }
+    .print-container { font-family: Arial, Helvetica, sans-serif; font-size:12px; padding:10px; }
+    .table-print { width:100%; border-collapse:collapse; margin-bottom:8px; }
+    .table-print th, .table-print td { border:1px solid #ddd; padding:6px; }
+    .print-title { font-size:16px; font-weight:700; margin-bottom:6px; }
+    .print-meta { font-size:11px; color:#666; }
+    footer { opacity:.8; }
+  </style>
 </head>
 <body>
   <div class="container py-4" id="root">
@@ -112,6 +126,16 @@
               </div>
             </div>
           </div>
+
+          <div class="col-12 col-md-4">
+            <div class="card tile" id="tileR7" role="button" tabindex="0">
+              <div class="card-body text-center">
+                <h5>Wykaz pojazdów R-7</h5>
+                <p class="small text-muted">Tworzenie i analiza wykazu pojazdów</p>
+              </div>
+            </div>
+          </div>
+
         </div>
       </div>
 
@@ -203,114 +227,218 @@
       <!-- REPORT PANEL (dynamicznie wstawiany) -->
       <div id="reportPanelContainer" style="display:none;"></div>
 
-      <!-- Modale (Traction, Conductor, Order, Station, Control, Note, User) -->
-      <!-- Traction -->
+      <!-- R-7 PANEL -->
+      <div id="r7Panel" class="card p-3 mb-3" style="display:none;">
+        <div class="d-flex justify-content-between align-items-center">
+          <h5 class="mb-0">Wykaz pojazdów R-7</h5>
+          <div>
+            <button id="backFromR7" class="btn btn-sm btn-outline-secondary">Powrót</button>
+            <button id="homeFromR7" class="btn btn-sm btn-outline-primary">Strona główna</button>
+          </div>
+        </div>
+        <hr>
+        <form id="r7GeneralForm" class="row g-2 mb-3">
+          <div class="col-6 col-md-3">
+            <label class="form-label small">Numer pociągu</label>
+            <input id="r7_trainNumber" class="form-control">
+          </div>
+          <div class="col-6 col-md-3">
+            <label class="form-label small">Wyprawiony dnia</label>
+            <input id="r7_date" type="date" class="form-control">
+          </div>
+          <div class="col-6 col-md-3">
+            <label class="form-label small">Ze stacji</label>
+            <input id="r7_from" class="form-control">
+          </div>
+          <div class="col-6 col-md-3">
+            <label class="form-label small">Do stacji</label>
+            <input id="r7_to" class="form-control">
+          </div>
+          <div class="col-6 col-md-3">
+            <label class="form-label small">Maszynista</label>
+            <input id="r7_driver" class="form-control">
+          </div>
+          <div class="col-6 col-md-3">
+            <label class="form-label small">Kierownik pociągu</label>
+            <input id="r7_conductor" class="form-control">
+          </div>
+        </form>
+
+        <div class="d-flex gap-2 mb-3">
+          <button id="r7_addLocomotive" class="btn btn-primary btn-sm">Dodaj lokomotywę</button>
+          <button id="r7_addWagon" class="btn btn-secondary btn-sm">Dodaj wagon</button>
+          <button id="r7_analyze" class="btn btn-success btn-sm ms-auto">Analiza</button>
+        </div>
+
+        <div id="r7ListContainer" class="mb-3">
+          <div id="r7List" class="list-group"></div>
+          <div class="small text-muted mt-2">Przeciągnij element, aby zmienić kolejność.</div>
+        </div>
+
+        <div id="r7Results" class="card p-3" style="display:none;">
+          <h6>Wyniki analizy</h6>
+          <table class="table table-sm">
+            <tbody>
+              <tr><th>Długość składu (m)</th><td id="res_length">-</td></tr>
+              <tr><th>Masa składu (wagony) (t)</th><td id="res_mass_wagons">-</td></tr>
+              <tr><th>Masa pociągu (lokomotywy + wagony) (t)</th><td id="res_mass_total">-</td></tr>
+              <tr><th>Masa hamująca składu (wagony) (t)</th><td id="res_brake_wagons">-</td></tr>
+              <tr><th>Masa hamująca pociągu (t)</th><td id="res_brake_total">-</td></tr>
+              <tr><th>Procent rzeczywisty masy składu (%)</th><td id="res_pct_wagons">-</td></tr>
+              <tr><th>Procent rzeczywisty masy pociągu (%)</th><td id="res_pct_total">-</td></tr>
+            </tbody>
+          </table>
+          <div class="d-flex justify-content-end">
+            <button id="r7_print_pdf" class="btn btn-outline-primary btn-sm">Drukuj w PDF</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Modale: Traction -->
       <div class="modal fade" id="modalTraction" tabindex="-1" aria-hidden="true">
         <div class="modal-dialog">
           <form id="formTraction" class="modal-content" data-mode="add" data-index="">
-            <div class="modal-header"><h5 class="modal-title">Dodaj pracownika drużyny trakcyjnej</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+            <div class="modal-header"><h5 class="modal-title">Dodaj/Edytuj członka drużyny trakcyjnej</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
             <div class="modal-body">
-              <div class="mb-2"><label class="form-label">Imię i nazwisko</label><input id="t_name" class="form-control" required></div>
-              <div class="mb-2"><label class="form-label">Numer służbowy</label><input id="t_id" class="form-control" required></div>
-              <div class="mb-2"><label class="form-label">ZDP</label><select id="t_zdp" class="form-select"><option>WAW</option><option>KRK</option><option>GDY</option><option>POZ</option></select></div>
-              <div class="mb-2"><label class="form-label">Oznaczenie lokomotywy</label><input id="t_loco" class="form-control"></div>
-              <div class="row g-2"><div class="col"><label class="form-label">Stacja od</label><input id="t_from" class="form-control" list="stationsDatalist"></div><div class="col"><label class="form-label">Stacja do</label><input id="t_to" class="form-control" list="stationsDatalist"></div></div>
+              <div class="mb-2"><label class="form-label small">Imię i nazwisko</label><input id="t_name" class="form-control" required></div>
+              <div class="mb-2"><label class="form-label small">Nr służbowy</label><input id="t_id" class="form-control" required></div>
+              <div class="mb-2"><label class="form-label small">ZDP</label><select id="t_zdp" class="form-select"><option>WAW</option><option>KRK</option><option>GDY</option><option>POZ</option></select></div>
+              <div class="mb-2"><label class="form-label small">Lokomotywa</label><input id="t_loco" class="form-control"></div>
+              <div class="mb-2"><label class="form-label small">Ze stacji</label><input id="t_from" class="form-control"></div>
+              <div class="mb-2"><label class="form-label small">Do stacji</label><input id="t_to" class="form-control"></div>
             </div>
             <div class="modal-footer"><button type="submit" class="btn btn-primary">Zapisz</button><button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Anuluj</button></div>
           </form>
         </div>
       </div>
 
-      <!-- Conductor -->
+      <!-- Modal: Conductor -->
       <div class="modal fade" id="modalConductor" tabindex="-1" aria-hidden="true">
         <div class="modal-dialog">
           <form id="formConductor" class="modal-content" data-mode="add" data-index="">
-            <div class="modal-header"><h5 class="modal-title">Dodaj pracownika drużyny konduktorskiej</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+            <div class="modal-header"><h5 class="modal-title">Dodaj/Edytuj członka drużyny konduktorskiej</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
             <div class="modal-body">
-              <div class="mb-2"><label class="form-label">Imię i nazwisko</label><input id="c_name" class="form-control" required></div>
-              <div class="mb-2"><label class="form-label">Numer służbowy</label><input id="c_id" class="form-control" required></div>
-              <div class="mb-2"><label class="form-label">ZDP</label><select id="c_zdp" class="form-select"><option>WAW</option><option>KRK</option><option>GDY</option><option>POZ</option></select></div>
-              <div class="mb-2"><label class="form-label">Funkcja</label><select id="c_role" class="form-select"><option>KP</option><option>S</option><option>B</option><option>K</option></select></div>
-              <div class="row g-2 mt-2"><div class="col"><label class="form-label">Stacja od</label><input id="c_from" class="form-control" list="stationsDatalist"></div><div class="col"><label class="form-label">Stacja do</label><input id="c_to" class="form-control" list="stationsDatalist"></div></div>
+              <div class="mb-2"><label class="form-label small">Imię i nazwisko</label><input id="c_name" class="form-control" required></div>
+              <div class="mb-2"><label class="form-label small">Nr służbowy</label><input id="c_id" class="form-control" required></div>
+              <div class="mb-2"><label class="form-label small">ZDP</label><select id="c_zdp" class="form-select"><option>WAW</option><option>KRK</option><option>GDY</option><option>POZ</option></select></div>
+              <div class="mb-2"><label class="form-label small">Funkcja</label><select id="c_role" class="form-select"><option>KP</option><option>SK</option></select></div>
+              <div class="mb-2"><label class="form-label small">Ze stacji</label><input id="c_from" class="form-control"></div>
+              <div class="mb-2"><label class="form-label small">Do stacji</label><input id="c_to" class="form-control"></div>
             </div>
             <div class="modal-footer"><button type="submit" class="btn btn-primary">Zapisz</button><button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Anuluj</button></div>
           </form>
         </div>
       </div>
 
-      <!-- Order -->
+      <!-- Modal: Order -->
       <div class="modal fade" id="modalOrder" tabindex="-1" aria-hidden="true">
         <div class="modal-dialog">
           <form id="formOrder" class="modal-content" data-mode="add" data-index="">
-            <div class="modal-header"><h5 class="modal-title">Dodaj dyspozycję</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+            <div class="modal-header"><h5 class="modal-title">Dodaj/Edytuj dyspozycję</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
             <div class="modal-body">
-              <div class="mb-2"><label class="form-label">Numer dyspozycji</label><input id="o_number" class="form-control" placeholder="np. R-307"></div>
-              <div class="mb-2"><label class="form-label">Godzina otrzymania (HH:MM)</label><input id="o_time" class="form-control" placeholder="13:05"></div>
-              <div class="mb-2"><label class="form-label">Treść dyspozycji</label><textarea id="o_text" class="form-control" rows="3" required></textarea></div>
-              <div class="mb-2"><label class="form-label">Źródło</label><select id="o_source" class="form-select"><option>Dyspozytura</option><option>PKP PLK</option><option>Inne</option></select></div>
+              <div class="mb-2"><label class="form-label small">Nr dyspozycji</label><input id="o_number" class="form-control"></div>
+              <div class="mb-2"><label class="form-label small">Godzina (HH:MM)</label><input id="o_time" class="form-control" placeholder="HH:MM"></div>
+              <div class="mb-2"><label class="form-label small">Treść</label><textarea id="o_text" class="form-control" rows="3" required></textarea></div>
+              <div class="mb-2"><label class="form-label small">Źródło</label><select id="o_source" class="form-select"><option>Dyspozytura</option><option>Telefon</option><option>Inne</option></select></div>
             </div>
             <div class="modal-footer"><button type="submit" class="btn btn-primary">Zapisz</button><button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Anuluj</button></div>
           </form>
         </div>
       </div>
 
-      <!-- Station -->
+      <!-- Modal: Station -->
       <div class="modal fade" id="modalStation" tabindex="-1" aria-hidden="true">
         <div class="modal-dialog modal-lg">
           <form id="formStation" class="modal-content" data-mode="add" data-index="">
-            <div class="modal-header"><h5 class="modal-title">Dodaj wpis stacji</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+            <div class="modal-header"><h5 class="modal-title">Dodaj/Edytuj dane stacji</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
             <div class="modal-body">
-              <div class="mb-2"><label class="form-label">Nazwa stacji</label><input id="s_station" class="form-control" list="stationsDatalist" required><datalist id="stationsDatalist"></datalist></div>
               <div class="row g-2">
-                <div class="col-6 col-md-3"><label class="form-label">Data przyjazdu (plan)</label><input id="s_dateArr" type="date" class="form-control"></div>
-                <div class="col-6 col-md-3"><label class="form-label">Godz. przyjazdu (plan)</label><input id="s_planArr" class="form-control" placeholder="HH:MM"></div>
-                <div class="col-6 col-md-3"><label class="form-label">Data przyjazdu (real)</label><input id="s_dateArrReal" type="date" class="form-control"></div>
-                <div class="col-6 col-md-3"><label class="form-label">Godz. przyjazdu (real)</label><input id="s_realArr" class="form-control" placeholder="HH:MM"></div>
+                <div class="col-12 col-md-6"><label class="form-label small">Stacja</label><input id="s_station" class="form-control" required></div>
+                <div class="col-6 col-md-3"><label class="form-label small">Data przyjazdu (plan)</label><input id="s_dateArr" type="date" class="form-control"></div>
+                <div class="col-6 col-md-3"><label class="form-label small">Godz. przyjazdu (plan)</label><input id="s_planArr" class="form-control" placeholder="HH:MM"></div>
+                <div class="col-6 col-md-3"><label class="form-label small">Data przyjazdu (real)</label><input id="s_dateArrReal" type="date" class="form-control"></div>
+                <div class="col-6 col-md-3"><label class="form-label small">Godz. przyjazdu (real)</label><input id="s_realArr" class="form-control" placeholder="HH:MM"></div>
+
+                <div class="col-6 col-md-3"><label class="form-label small">Data odjazdu (plan)</label><input id="s_dateDep" type="date" class="form-control"></div>
+                <div class="col-6 col-md-3"><label class="form-label small">Godz. odjazdu (plan)</label><input id="s_planDep" class="form-control" placeholder="HH:MM"></div>
+                <div class="col-6 col-md-3"><label class="form-label small">Data odjazdu (real)</label><input id="s_dateDepReal" type="date" class="form-control"></div>
+                <div class="col-6 col-md-3"><label class="form-label small">Godz. odjazdu (real)</label><input id="s_realDep" class="form-control" placeholder="HH:MM"></div>
+
+                <div class="col-12"><label class="form-label small">Powód opóźnienia</label><input id="s_delayReason" class="form-control"></div>
+                <div class="col-12"><label class="form-label small">Rozkazy pisemne / uwagi</label><input id="s_writtenOrders" class="form-control"></div>
               </div>
-              <div class="row g-2 mt-2">
-                <div class="col-6 col-md-3"><label class="form-label">Data odjazdu (plan)</label><input id="s_dateDep" type="date" class="form-control"></div>
-                <div class="col-6 col-md-3"><label class="form-label">Godz. odjazdu (plan)</label><input id="s_planDep" class="form-control" placeholder="HH:MM"></div>
-                <div class="col-6 col-md-3"><label class="form-label">Data odjazdu (real)</label><input id="s_dateDepReal" type="date" class="form-control"></div>
-                <div class="col-6 col-md-3"><label class="form-label">Godz. odjazdu (real)</label><input id="s_realDep" class="form-control" placeholder="HH:MM"></div>
-              </div>
-              <div class="mb-2 mt-2"><label class="form-label">Powód opóźnienia</label><input id="s_delayReason" class="form-control"></div>
-              <div class="mb-2"><label class="form-label">Rozkazy pisemne</label><input id="s_writtenOrders" class="form-control"></div>
             </div>
             <div class="modal-footer"><button type="submit" class="btn btn-primary">Zapisz</button><button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Anuluj</button></div>
           </form>
         </div>
       </div>
 
-      <!-- Control -->
+      <!-- Modal: Control -->
       <div class="modal fade" id="modalControl" tabindex="-1" aria-hidden="true">
         <div class="modal-dialog">
           <form id="formControl" class="modal-content" data-mode="add" data-index="">
-            <div class="modal-header"><h5 class="modal-title">Dodaj kontrolę pociągu</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+            <div class="modal-header"><h5 class="modal-title">Dodaj/Edytuj kontrolę pociągu</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
             <div class="modal-body">
-              <div class="mb-2"><label class="form-label">Imię i nazwisko kontrolującego</label><input id="f_by" class="form-control" required></div>
-              <div class="mb-2"><label class="form-label">Numer służbowy</label><input id="f_id" class="form-control"></div>
-              <div class="mb-2"><label class="form-label">Opis kontroli</label><textarea id="f_desc" class="form-control" rows="3"></textarea></div>
-              <div class="mb-2"><label class="form-label">Uwagi</label><input id="f_notes" class="form-control"></div>
+              <div class="mb-2"><label class="form-label small">Kontrolujący</label><input id="f_by" class="form-control" required></div>
+              <div class="mb-2"><label class="form-label small">Nr służbowy</label><input id="f_id" class="form-control"></div>
+              <div class="mb-2"><label class="form-label small">Opis</label><input id="f_desc" class="form-control"></div>
+              <div class="mb-2"><label class="form-label small">Uwagi</label><input id="f_notes" class="form-control"></div>
             </div>
             <div class="modal-footer"><button type="submit" class="btn btn-primary">Zapisz</button><button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Anuluj</button></div>
           </form>
         </div>
       </div>
 
-      <!-- Note -->
+      <!-- Modal: Note -->
       <div class="modal fade" id="modalNote" tabindex="-1" aria-hidden="true">
         <div class="modal-dialog">
           <form id="formNote" class="modal-content" data-mode="add" data-index="">
-            <div class="modal-header"><h5 class="modal-title">Dodaj uwagę kierownika</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+            <div class="modal-header"><h5 class="modal-title">Dodaj/Edytuj uwagę</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
             <div class="modal-body">
-              <div class="mb-2"><label class="form-label">Treść uwagi</label><textarea id="n_text" class="form-control" rows="3" required></textarea></div>
+              <div class="mb-2"><label class="form-label small">Treść uwagi</label><textarea id="n_text" class="form-control" rows="3" required></textarea></div>
             </div>
             <div class="modal-footer"><button type="submit" class="btn btn-primary">Zapisz</button><button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Anuluj</button></div>
           </form>
         </div>
       </div>
 
-      <!-- User -->
+      <!-- Modal: Dodaj pojazd R-7 -->
+      <div class="modal fade" id="modalR7Vehicle" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-lg">
+          <form id="formR7Vehicle" class="modal-content" data-mode="add" data-index="">
+            <div class="modal-header">
+              <h5 class="modal-title">Dodaj pojazd (lokomotywa/wagon)</h5>
+              <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+              <div class="row g-2">
+                <div class="col-6 col-md-3"><label class="form-label small">Typ</label><select id="v_type" class="form-select"><option value="locomotive">Lokomotywa</option><option value="wagon">Wagon</option></select></div>
+                <div class="col-6 col-md-3"><label class="form-label small">EVN / ID</label><input id="v_evn" class="form-control"></div>
+                <div class="col-6 col-md-2"><label class="form-label small">Państwo</label><select id="v_country" class="form-select"><option>PL</option><option>CZ</option><option>AT</option><option>D</option><option>SK</option></select></div>
+                <div class="col-6 col-md-2"><label class="form-label small">Eksploatujący</label><select id="v_operator" class="form-select"><option>RJ</option><option>OBB</option><option>CD</option><option>DB</option><option>ZSSK</option></select></div>
+                <div class="col-6 col-md-2"><label class="form-label small">Kod cyfrowy</label><input id="v_operator_code" class="form-control" maxlength="4"></div>
+
+                <div class="col-6 col-md-3"><label class="form-label small">Typ / seria</label><input id="v_series" class="form-control"></div>
+                <div class="col-6 col-md-3"><label class="form-label small">Długość (m)</label><input id="v_length" class="form-control" placeholder="np. 19.50"></div>
+                <div class="col-6 col-md-2"><label class="form-label small">Masa ładunku (t)</label><input id="v_payload" class="form-control" placeholder="0"></div>
+                <div class="col-6 col-md-2"><label class="form-label small">Masa własna (t)</label><input id="v_empty_mass" class="form-control" placeholder="0"></div>
+                <div class="col-6 col-md-2"><label class="form-label small">Masa hamująca (t)</label><input id="v_brake_mass" class="form-control" placeholder="0"></div>
+
+                <div class="col-6 col-md-3"><label class="form-label small">Rodzaj nastawy</label><select id="v_brake_type" class="form-select"><option>G</option><option>P</option><option>R</option><option>&lt;R&gt;</option><option>R+Mg</option></select></div>
+                <div class="col-6 col-md-3"><label class="form-label small">Stacja nadania</label><input id="v_from" class="form-control"></div>
+                <div class="col-6 col-md-3"><label class="form-label small">Stacja przeznaczenia</label><input id="v_to" class="form-control"></div>
+                <div class="col-12"><label class="form-label small">Uwagi</label><input id="v_notes" class="form-control"></div>
+              </div>
+            </div>
+            <div class="modal-footer">
+              <button id="saveR7Vehicle" type="submit" class="btn btn-primary">Zapisz</button>
+              <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Anuluj</button>
+            </div>
+          </form>
+        </div>
+      </div>
+
+      <!-- User modal -->
       <div class="modal fade" id="modalUser" tabindex="-1" aria-hidden="true">
         <div class="modal-dialog">
           <form id="formUser" class="modal-content" data-mode="add" data-index="">
