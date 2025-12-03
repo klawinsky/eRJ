@@ -29,10 +29,6 @@ export async function getUserByEmailOrId(key) {
   return users.find(u => (u.email && u.email === key) || (u.id && u.id === key)) || null;
 }
 
-/*
-  registerUser - zapisuje metadane użytkownika.
-  Uwaga: hasła są przechowywane w auth.js (oddzielnie).
-*/
 export async function registerUser({ name, id, zdp, email, role, status }) {
   const users = read(LS_USERS, []);
   if (users.find(u => u.email === email || u.id === id)) throw new Error('Użytkownik już istnieje');
