@@ -19,12 +19,10 @@ function write(key, val) { localStorage.setItem(key, JSON.stringify(val)); }
 async function ensureSeed() {
   const users = read(LS_USERS, []);
   const auth = read(LS_AUTH, {});
-  // Dodaj użytkownika admin jeśli nie istnieje
   if (!users.find(u => u.email === ADMIN_EMAIL)) {
     users.push({ name: 'Paweł Klawiński', id: ADMIN_ID, zdp: 'WAW', email: ADMIN_EMAIL, role: 'admin', status: 'active' });
     write(LS_USERS, users);
   }
-  // Zasiej hasło admina jeśli nie ma
   if (!auth[ADMIN_EMAIL]) {
     auth[ADMIN_EMAIL] = await hashPassword(ADMIN_PLAIN);
     write(LS_AUTH, auth);
@@ -33,11 +31,9 @@ async function ensureSeed() {
 
 export async function initAuth() {
   await ensureSeed();
-  // Zwracamy plain demo hasło, ułatwia przycisk "Demo" w UI
   return ADMIN_PLAIN;
 }
 
-/* Rejestracja użytkownika: zapis metadanych w users i hash hasła w auth */
 export async function registerUser({ name, id, zdp, email, password, role, status }) {
   const users = read(LS_USERS, []);
   if (users.find(u => u.email === email || u.id === id)) throw new Error('Użytkownik już istnieje');
@@ -49,7 +45,6 @@ export async function registerUser({ name, id, zdp, email, password, role, statu
   return true;
 }
 
-/* Logowanie: akceptuje email lub numer służbowy */
 export async function login(idOrEmail, password, remember = false) {
   const users = read(LS_USERS, []);
   const user = users.find(u => u.email === idOrEmail || u.id === idOrEmail);
@@ -75,7 +70,6 @@ export function currentUser() {
   try { const obj = JSON.parse(s); return obj.user; } catch { return null; }
 }
 
-/* Proste hashowanie SHA-256 (nie produkcyjne, ale wystarczające do demo) */
 export async function hashPassword(pw) {
   const enc = new TextEncoder();
   const data = enc.encode((pw || '') + '::erj_salt_v1');
