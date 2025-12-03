@@ -1,11 +1,12 @@
 // js/db.js
 // Prosty lokalny "DB" oparty na localStorage.
-// Przeznaczony do środowiska deweloperskiego / demo.
+// Rozszerzony o obsługę zniżek ustawowych.
 
 const LS_USERS = 'erj_users_v1';
 const LS_REPORTS = 'erj_reports_v1';
 const LS_PHONEBOOK = 'erj_phonebook_v1';
 const LS_COUNTER = 'erj_counter_v1';
+const LS_DISCOUNTS = 'erj_discounts_v1';
 
 function read(key, def) {
   try {
@@ -85,4 +86,41 @@ export async function listPhonebookLocal() {
 export async function replacePhonebookLocal(entries) {
   write(LS_PHONEBOOK, entries);
   return entries;
+}
+
+/* ---------- Discounts (zniżki) ---------- */
+export async function listDiscounts() {
+  // zwraca tablicę obiektów: { code, name, type, value, description }
+  return read(LS_DISCOUNTS, seedDiscounts());
+}
+
+export async function replaceDiscounts(entries) {
+  // entries: [{code,name,type,value,description}, ...]
+  write(LS_DISCOUNTS, entries);
+  return entries;
+}
+
+export async function addDiscount(entry) {
+  const arr = read(LS_DISCOUNTS, seedDiscounts());
+  arr.push(entry);
+  write(LS_DISCOUNTS, arr);
+  return entry;
+}
+
+export async function resetDiscountsToSeed() {
+  const seed = seedDiscounts();
+  write(LS_DISCOUNTS, seed);
+  return seed;
+}
+
+/* ---------- Seed danych zniżek (przykładowe) ---------- */
+function seedDiscounts() {
+  // Domyślne przykładowe zniżki. Możesz je zastąpić danymi z załącznika.
+  return [
+    { code: 'U50', name: 'Ulgowy 50% (senior/uczestnik)', type: 'percent', value: '50', description: 'Zniżka 50% na bilety krajowe (wybrane grupy)' },
+    { code: 'U37', name: 'Ulgowy 37% (student)', type: 'percent', value: '37', description: 'Zniżka 37% dla studentów i uczniów' },
+    { code: 'D95', name: 'Dzieci 95% (dziecięca)', type: 'percent', value: '95', description: 'Zniżka 95% dla dzieci (wg przepisów)' },
+    { code: 'EXEMPT', name: 'Zwolnienie 100% (osoby niepełnosprawne)', type: 'exemption', value: '100', description: 'Pełne zwolnienie dla uprawnionych osób' },
+    { code: 'FAM', name: 'Rodzinny (stała)', type: 'fixed', value: 'bezpłatny/obniżony', description: 'Zniżki rodzinne i specjalne' }
+  ];
 }
