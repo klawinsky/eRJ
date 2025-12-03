@@ -1,18 +1,21 @@
 // js/app.js
+// Pełny, kompletny plik aplikacji — logowanie, dashboard, admin, phonebook, raport A-G, R-7, zniżki.
+// Wymaga: js/db.js, js/auth.js, js/pdf.js, js/discounts.js
+
 import { listUsers, getUserByEmailOrId, updateUser, deleteUser, saveReport, nextCounter, getReport, listReports, listPhonebookLocal, replacePhonebookLocal } from './db.js';
 import { initAuth, registerUser, login, logout, currentUser, hashPassword } from './auth.js';
 import { exportPdf, exportR7Pdf } from './pdf.js';
+import { initDiscountsUI } from './discounts.js';
 
 /* ---------- Helpers ---------- */
 function qs(id){ return document.getElementById(id); }
+function qsa(sel){ return Array.from(document.querySelectorAll(sel)); }
 function el(tag, cls){ const d=document.createElement(tag); if(cls) d.className=cls; return d; }
 function safeText(v){ return (v===undefined||v===null||v==='')?'-':v; }
 function toNumber(v){ const n=parseFloat(String(v||'').replace(',','.')); return isNaN(n)?0:n; }
-function round2(v){ return Math.round((v+Number.EPSILON)*100)/100; }
+function round2(v){ return Math.round((Number(v)+Number.EPSILON)*100)/100; }
 function isValidTime(t){ if(!t) return true; return /^([01]\d|2[0-3]):[0-5]\d$/.test(t); }
 function parseDateTime(dateStr, timeStr, fallbackDate){ if(!timeStr) return null; const useDate=dateStr||fallbackDate; if(!useDate) return null; const [yyyy,mm,dd]=useDate.split('-').map(Number); const [hh,mi]=timeStr.split(':').map(Number); return new Date(yyyy,mm-1,dd,hh,mi).getTime(); }
-function formatDelayClass(v){ if(v==null) return 'delay-zero'; if(v>0) return 'delay-pos'; if(v<0) return 'delay-neg'; return 'delay-zero'; }
-function formatDelayText(v){ if(v==null) return '-'; return `${v} min`; }
 
 /* ---------- Config ---------- */
 // Raw URL do pliku książki telefonicznej w repo GitHub (zmień na własne repo)
@@ -20,15 +23,16 @@ const PHONEBOOK_GITHUB_RAW = 'https://raw.githubusercontent.com/your-org/your-re
 
 /* ---------- App Init ---------- */
 document.addEventListener('DOMContentLoaded', async () => {
+  // Initialize auth (creates default admin if needed) and returns admin plain password for demo button
   const adminPlain = await initAuth();
 
-  /* UI refs */
+  /* ---------- UI refs ---------- */
   const loginView = qs('loginView'), appShell = qs('appShell');
   const loginForm = qs('loginForm'), loginId = qs('loginId'), loginPassword = qs('loginPassword'), loginMsg = qs('loginMsg'), demoBtn = qs('demoBtn'), rememberMe = qs('rememberMe');
   const loggedUserInfo = qs('loggedUserInfo'), btnLogout = qs('btnLogout'), btnHome = qs('btnHome');
 
   const dashboard = qs('dashboard');
-  const tileHandleTrain = qs('tileHandleTrain'), tileTakeOver = qs('tileTakeOver'), tileAdmin = qs('tileAdmin'), tilePhonebook = qs('tilePhonebook'), tileR7 = qs('tileR7');
+  const tileHandleTrain = qs('tileHandleTrain'), tileTakeOver = qs('tileTakeOver'), tileAdmin = qs('tileAdmin'), tilePhonebook = qs('tilePhonebook'), tileR7 = qs('tileR7'), tileDiscounts = qs('tileDiscounts');
 
   const handleTrainMenu = qs('handleTrainMenu'), backFromHandle = qs('backFromHandle'), homeFromHandle = qs('homeFromHandle');
   const takeOverMenu = qs('takeOverMenu'), backFromTakeover = qs('backFromTakeover'), homeFromTakeover = qs('homeFromTakeover'), takeoverForm = qs('takeoverForm'), takeoverMsg = qs('takeoverMsg');
@@ -41,25 +45,30 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   const reportPanelContainer = qs('reportPanelContainer');
 
-  // R7 refs
-  const r7Panel = qs('r7Panel'), backFromR7 = qs('backFromR7'), homeFromR7 = qs('homeFromR7');
-  const r7_addLocomotive = qs('r7_addLocomotive'), r7_addWagon = qs('r7_addWagon'), r7_analyze = qs('r7_analyze');
-  const r7List = qs('r7List'), r7Results = qs('r7Results');
-  const formR7Vehicle = qs('formR7Vehicle'), modalR7Vehicle = qs('modalR7Vehicle');
-  const r7_print_pdf = qs('r7_print_pdf');
+  // Discounts panel refs
+  const discountsPanel = qs('discountsPanel'), backFromDiscounts = qs('backFromDiscounts'), homeFromDiscounts = qs('homeFromDiscounts');
 
-  /* Session helpers */
-  function showLogin(){ loginView.style.display='block'; appShell.style.display='none'; }
+  // R7 panel elements (may be in index.html or created dynamically)
+  const r7Panel = qs('r7Panel'), backFromR7 = qs('backFromR7'), homeFromR7 = qs('homeFromR7');
+  const r7List = qs('r7List');
+  const r7_addLocomotive = qs('r7_addLocomotive'), r7_addWagon = qs('r7_addWagon'), r7_analyze = qs('r7_analyze');
+  const r7Results = qs('r7Results'), r7_print_pdf = qs('r7_print_pdf');
+  const formR7Vehicle = qs('formR7Vehicle'), modalR7Vehicle = qs('modalR7Vehicle');
+
+  /* ---------- Session helpers ---------- */
+  function showLogin(){ if(loginView) loginView.style.display='block'; if(appShell) appShell.style.display='none'; }
   async function showAppFor(user){
-    loginView.style.display='none'; appShell.style.display='block';
-    loggedUserInfo.textContent = `${user.name} (${user.id}) · ${user.role}`;
-    adminPanel.style.display = 'none';
-    dashboard.style.display = 'block';
-    handleTrainMenu.style.display = 'none';
-    takeOverMenu.style.display = 'none';
-    phonebookPanel.style.display = 'none';
-    reportPanelContainer.style.display = 'none';
+    if(loginView) loginView.style.display='none'; if(appShell) appShell.style.display='block';
+    if(loggedUserInfo) loggedUserInfo.textContent = `${user.name} (${user.id}) · ${user.role}`;
+    // hide all panels
+    if(adminPanel) adminPanel.style.display = 'none';
+    if(handleTrainMenu) handleTrainMenu.style.display = 'none';
+    if(takeOverMenu) takeOverMenu.style.display = 'none';
+    if(phonebookPanel) phonebookPanel.style.display = 'none';
+    if(reportPanelContainer) reportPanelContainer.style.display = 'none';
     if(r7Panel) r7Panel.style.display = 'none';
+    if(discountsPanel) discountsPanel.style.display = 'none';
+    if(dashboard) dashboard.style.display = 'block';
     await refreshUsersTable();
     await loadPhonebookFromGithub();
   }
@@ -72,133 +81,161 @@ document.addEventListener('DOMContentLoaded', async () => {
   }
 
   /* ---------- Auth / Login ---------- */
-  loginForm && loginForm.addEventListener('submit', async (e)=>{ 
-    e.preventDefault(); 
-    loginMsg.textContent=''; 
-    const id=loginId.value.trim(); 
-    const pw=loginPassword.value; 
-    const remember = rememberMe && rememberMe.checked;
-    if(!id||!pw) return loginMsg.textContent='Podaj login i hasło.'; 
-    const res=await login(id,pw,remember); 
-    if(!res.ok) return loginMsg.textContent=res.reason||'Błąd logowania'; 
-    await showAppFor(res.user); 
-  });
+  if(loginForm){
+    loginForm.addEventListener('submit', async (e)=>{ 
+      e.preventDefault(); 
+      if(loginMsg) loginMsg.textContent=''; 
+      const id=loginId.value.trim(); 
+      const pw=loginPassword.value; 
+      const remember = rememberMe && rememberMe.checked;
+      if(!id||!pw) return loginMsg && (loginMsg.textContent='Podaj login i hasło.'); 
+      const res=await login(id,pw,remember); 
+      if(!res.ok) return loginMsg && (loginMsg.textContent=res.reason||'Błąd logowania'); 
+      await showAppFor(res.user); 
+    });
+  }
 
-  demoBtn && demoBtn.addEventListener('click', ()=>{ 
-    loginId.value='klawinski.pawel@gmail.com'; 
-    loginPassword.value=adminPlain; 
-    if(rememberMe) rememberMe.checked = true; 
-    loginForm.dispatchEvent(new Event('submit',{cancelable:true})); 
-  });
+  if(demoBtn){
+    demoBtn.addEventListener('click', ()=>{ 
+      if(loginId) loginId.value='klawinski.pawel@gmail.com'; 
+      if(loginPassword) loginPassword.value=adminPlain; 
+      if(rememberMe) rememberMe.checked = true; 
+      loginForm && loginForm.dispatchEvent(new Event('submit',{cancelable:true})); 
+    });
+  }
 
-  btnLogout && btnLogout.addEventListener('click', ()=>{ logout(); showLogin(); loginId.value=''; loginPassword.value=''; loginMsg.textContent=''; });
+  if(btnLogout){
+    btnLogout.addEventListener('click', ()=>{ logout(); showLogin(); if(loginId) loginId.value=''; if(loginPassword) loginPassword.value=''; if(loginMsg) loginMsg.textContent=''; });
+  }
 
-  btnHome && btnHome.addEventListener('click', ()=>{ 
-    dashboard.style.display = 'block'; 
-    handleTrainMenu.style.display = 'none'; 
-    takeOverMenu.style.display = 'none'; 
-    adminPanel.style.display = 'none'; 
-    phonebookPanel.style.display = 'none'; 
-    reportPanelContainer.style.display = 'none'; 
-    if(r7Panel) r7Panel.style.display='none';
-  });
+  if(btnHome){
+    btnHome.addEventListener('click', ()=>{ 
+      if(dashboard) dashboard.style.display = 'block'; 
+      if(handleTrainMenu) handleTrainMenu.style.display = 'none'; 
+      if(takeOverMenu) takeOverMenu.style.display = 'none'; 
+      if(adminPanel) adminPanel.style.display='none'; 
+      if(phonebookPanel) phonebookPanel.style.display='none'; 
+      if(reportPanelContainer) reportPanelContainer.style.display='none'; 
+      if(r7Panel) r7Panel.style.display='none';
+      if(discountsPanel) discountsPanel.style.display='none';
+    });
+  }
 
   /* ---------- Dashboard navigation ---------- */
-  tileHandleTrain && tileHandleTrain.addEventListener('click', ()=>{ dashboard.style.display='none'; handleTrainMenu.style.display='block'; });
-  backFromHandle && backFromHandle.addEventListener('click', ()=>{ handleTrainMenu.style.display='none'; dashboard.style.display='block'; });
-  homeFromHandle && homeFromHandle.addEventListener('click', ()=>{ handleTrainMenu.style.display='none'; dashboard.style.display='block'; });
+  if(tileHandleTrain) tileHandleTrain.addEventListener('click', ()=>{ if(dashboard) dashboard.style.display='none'; if(handleTrainMenu) handleTrainMenu.style.display='block'; });
+  if(backFromHandle) backFromHandle.addEventListener('click', ()=>{ if(handleTrainMenu) handleTrainMenu.style.display='none'; if(dashboard) dashboard.style.display='block'; });
+  if(homeFromHandle) homeFromHandle.addEventListener('click', ()=>{ if(handleTrainMenu) handleTrainMenu.style.display='none'; if(dashboard) dashboard.style.display='block'; });
 
-  tileTakeOver && tileTakeOver.addEventListener('click', ()=>{ dashboard.style.display='none'; takeOverMenu.style.display='block'; });
-  backFromTakeover && backFromTakeover.addEventListener('click', ()=>{ takeOverMenu.style.display='none'; dashboard.style.display='block'; });
-  homeFromTakeover && homeFromTakeover.addEventListener('click', ()=>{ takeOverMenu.style.display='none'; dashboard.style.display='block'; });
+  if(tileTakeOver) tileTakeOver.addEventListener('click', ()=>{ if(dashboard) dashboard.style.display='none'; if(takeOverMenu) takeOverMenu.style.display='block'; });
+  if(backFromTakeover) backFromTakeover.addEventListener('click', ()=>{ if(takeOverMenu) takeOverMenu.style.display='none'; if(dashboard) dashboard.style.display='block'; });
+  if(homeFromTakeover) homeFromTakeover.addEventListener('click', ()=>{ if(takeOverMenu) takeOverMenu.style.display='none'; if(dashboard) dashboard.style.display='block'; });
 
-  tileAdmin && tileAdmin.addEventListener('click', async ()=>{ const u=currentUser(); if(!u||u.role!=='admin') return alert('Brak uprawnień. Panel administracyjny dostępny tylko dla administratora.'); dashboard.style.display='none'; adminPanel.style.display='block'; await refreshUsersTable(); });
-  backFromAdmin && backFromAdmin.addEventListener('click', ()=>{ adminPanel.style.display='none'; dashboard.style.display='block'; });
-  homeFromAdmin && homeFromAdmin.addEventListener('click', ()=>{ adminPanel.style.display='none'; dashboard.style.display='block'; });
+  if(tileAdmin) tileAdmin.addEventListener('click', async ()=>{ const u=currentUser(); if(!u||u.role!=='admin') return alert('Brak uprawnień. Panel administracyjny dostępny tylko dla administratora.'); if(dashboard) dashboard.style.display='none'; if(adminPanel) adminPanel.style.display='block'; await refreshUsersTable(); });
+  if(backFromAdmin) backFromAdmin.addEventListener('click', ()=>{ if(adminPanel) adminPanel.style.display='none'; if(dashboard) dashboard.style.display='block'; });
+  if(homeFromAdmin) homeFromAdmin.addEventListener('click', ()=>{ if(adminPanel) adminPanel.style.display='none'; if(dashboard) dashboard.style.display='block'; });
 
-  tilePhonebook && tilePhonebook.addEventListener('click', async ()=>{ dashboard.style.display='none'; phonebookPanel.style.display='block'; await loadPhonebookFromGithub(); });
-  backFromPhonebook && backFromPhonebook.addEventListener('click', ()=>{ phonebookPanel.style.display='none'; dashboard.style.display='block'; });
-  homeFromPhonebook && homeFromPhonebook.addEventListener('click', ()=>{ phonebookPanel.style.display='none'; dashboard.style.display='block'; });
+  if(tilePhonebook) tilePhonebook.addEventListener('click', async ()=>{ if(dashboard) dashboard.style.display='none'; if(phonebookPanel) phonebookPanel.style.display='block'; await loadPhonebookFromGithub(); });
+  if(backFromPhonebook) backFromPhonebook.addEventListener('click', ()=>{ if(phonebookPanel) phonebookPanel.style.display='none'; if(dashboard) dashboard.style.display='block'; });
+  if(homeFromPhonebook) homeFromPhonebook.addEventListener('click', ()=>{ if(phonebookPanel) phonebookPanel.style.display='none'; if(dashboard) dashboard.style.display='block'; });
 
-  tileR7 && tileR7.addEventListener('click', ()=>{ dashboard.style.display='none'; if(r7Panel) r7Panel.style.display='block'; });
-  backFromR7 && backFromR7.addEventListener('click', ()=>{ if(r7Panel) r7Panel.style.display='none'; dashboard.style.display='block'; });
-  homeFromR7 && homeFromR7.addEventListener('click', ()=>{ if(r7Panel) r7Panel.style.display='none'; dashboard.style.display='block'; });
+  if(tileR7) tileR7.addEventListener('click', ()=>{ if(dashboard) dashboard.style.display='none'; if(r7Panel) r7Panel.style.display='block'; });
+  if(backFromR7) backFromR7.addEventListener('click', ()=>{ if(r7Panel) r7Panel.style.display='none'; if(dashboard) dashboard.style.display='block'; });
+  if(homeFromR7) homeFromR7.addEventListener('click', ()=>{ if(r7Panel) r7Panel.style.display='none'; if(dashboard) dashboard.style.display='block'; });
+
+  // NOWA ZAKŁADKA: ZNIŻKI
+  if(tileDiscounts){
+    tileDiscounts.addEventListener('click', async ()=> {
+      if(dashboard) dashboard.style.display='none';
+      if(discountsPanel) discountsPanel.style.display='block';
+      try {
+        await initDiscountsUI();
+      } catch (err) {
+        console.error('Błąd inicjalizacji zniżek:', err);
+        alert('Błąd ładowania zakładki zniżek.');
+      }
+    });
+  }
+  if(backFromDiscounts) backFromDiscounts.addEventListener('click', ()=>{ if(discountsPanel) discountsPanel.style.display='none'; if(dashboard) dashboard.style.display='block'; });
+  if(homeFromDiscounts) homeFromDiscounts.addEventListener('click', ()=>{ if(discountsPanel) discountsPanel.style.display='none'; if(dashboard) dashboard.style.display='block'; });
 
   /* ---------- TAKEOVER form ---------- */
-  takeoverForm && takeoverForm.addEventListener('submit', async (e)=>{ 
-    e.preventDefault(); 
-    takeoverMsg.textContent=''; 
-    const trainNum = qs('takeoverTrainNumber').value.trim(); 
-    const date = qs('takeoverDate').value; 
-    if(!trainNum || !date) return takeoverMsg.textContent='Wypełnij numer pociągu i datę.'; 
-    const reports = await listReports(); 
-    const found = reports.find(r => (r.sectionA && r.sectionA.trainNumber && r.sectionA.trainNumber.includes(trainNum)) || (r.createdBy && r.createdBy.id === trainNum) || (r.currentDriver && r.currentDriver.id === trainNum)); 
-    if(!found) return takeoverMsg.textContent='Nie znaleziono raportu dla podanego numeru i daty.'; 
-    const u = currentUser(); 
-    found.takenBy = { name: u.name, id: u.id, at: new Date().toISOString() }; 
-    found.currentDriver = { name: u.name, id: u.id }; 
-    await saveReport(found); 
-    openReportUI(found); 
-  });
+  if(takeoverForm){
+    takeoverForm.addEventListener('submit', async (e)=>{ 
+      e.preventDefault(); 
+      if(takeoverMsg) takeoverMsg.textContent=''; 
+      const trainNum = qs('takeoverTrainNumber').value.trim(); 
+      const date = qs('takeoverDate').value; 
+      if(!trainNum || !date) return takeoverMsg && (takeoverMsg.textContent='Wypełnij numer pociągu i datę.'); 
+      const reports = await listReports(); 
+      const found = reports.find(r => (r.sectionA && r.sectionA.trainNumber && r.sectionA.trainNumber.includes(trainNum)) || (r.createdBy && r.createdBy.id === trainNum) || (r.currentDriver && r.currentDriver.id === trainNum)); 
+      if(!found) return takeoverMsg && (takeoverMsg.textContent='Nie znaleziono raportu dla podanego numeru i daty.'); 
+      const u = currentUser(); 
+      found.takenBy = { name: u.name, id: u.id, at: new Date().toISOString() }; 
+      found.currentDriver = { name: u.name, id: u.id }; 
+      await saveReport(found); 
+      openReportUI(found); 
+    });
+  }
 
   /* ---------- HANDLE TRAIN menu buttons ---------- */
-  btnNewReport && btnNewReport.addEventListener('click', async ()=> {
-    const u = currentUser();
-    const name = u?.name || '';
-    const id = u?.id || '';
-    if(!name || !id) return alert('Brak danych prowadzącego. Uzupełnij profil.');
-    const c = await nextCounter();
-    const d = new Date();
-    const DD = String(d.getDate()).padStart(2,'0');
-    const MM = String(d.getMonth()+1).padStart(2,'0');
-    const YY = String(d.getFullYear()).slice(-2);
-    const XXX = String(c).padStart(3,'0');
-    const number = `${XXX}/${DD}/${MM}/${YY}`;
-    const report = {
-      number,
-      createdAt: new Date().toISOString(),
-      createdBy: { name, id },
-      currentDriver: { name, id },
-      sectionA: { category:'', traction:'', trainNumber:'', route:'', date: d.toISOString().slice(0,10) },
-      sectionB:[], sectionC:[], sectionD:[], sectionE:[], sectionF:[], sectionG:[], r7List:[], r7Meta:{}, brakeTests:[], history:[]
-    };
-    await saveReport(report);
-    openReportUI(report);
-  });
+  if(btnNewReport){
+    btnNewReport.addEventListener('click', async ()=> {
+      const u = currentUser();
+      const name = u?.name || '';
+      const id = u?.id || '';
+      if(!name || !id) return alert('Brak danych prowadzącego. Uzupełnij profil.');
+      const c = await nextCounter();
+      const d = new Date();
+      const DD = String(d.getDate()).padStart(2,'0');
+      const MM = String(d.getMonth()+1).padStart(2,'0');
+      const YY = String(d.getFullYear()).slice(-2);
+      const XXX = String(c).padStart(3,'0');
+      const number = `${XXX}/${DD}/${MM}/${YY}`;
+      const report = {
+        number,
+        createdAt: new Date().toISOString(),
+        createdBy: { name, id },
+        currentDriver: { name, id },
+        sectionA: { category:'', traction:'', trainNumber:'', route:'', date: d.toISOString().slice(0,10) },
+        sectionB:[], sectionC:[], sectionD:[], sectionE:[], sectionF:[], sectionG:[], r7List:[], r7Meta:{}, brakeTests:[], history:[]
+      };
+      await saveReport(report);
+      openReportUI(report);
+    });
+  }
 
-  // New R7: utwórz nowy raport z pustym wykazem i otwórz panel R7
-  btnNewR7 && btnNewR7.addEventListener('click', async ()=> {
-    const u = currentUser();
-    const name = u?.name || '';
-    const id = u?.id || '';
-    if(!name || !id) return alert('Brak danych prowadzącego. Uzupełnij profil.');
-    const c = await nextCounter();
-    const d = new Date();
-    const DD = String(d.getDate()).padStart(2,'0');
-    const MM = String(d.getMonth()+1).padStart(2,'0');
-    const YY = String(d.getFullYear()).slice(-2);
-    const XXX = String(c).padStart(3,'0');
-    const number = `R7-${XXX}-${DD}${MM}${YY}`;
-    const report = {
-      number,
-      createdAt: new Date().toISOString(),
-      createdBy: { name, id },
-      currentDriver: { name, id },
-      sectionA: { category:'', traction:'', trainNumber:'', route:'', date: d.toISOString().slice(0,10) },
-      sectionB:[], sectionC:[], sectionD:[], sectionE:[], sectionF:[], sectionG:[], r7List:[], r7Meta:{}, brakeTests:[], history:[]
-    };
-    await saveReport(report);
-    // open R7 panel directly and set currentReport
-    currentReport = report;
-    dashboard.style.display='none';
-    handleTrainMenu.style.display='none';
-    reportPanelContainer.style.display='none';
-    if(r7Panel) r7Panel.style.display='block';
-    // populate general fields
-    qs('r7_trainNumber') && (qs('r7_trainNumber').value = report.sectionA.trainNumber || '');
-    qs('r7_date') && (qs('r7_date').value = report.sectionA.date || '');
-    renderR7List(report);
-  });
+  if(btnNewR7){
+    btnNewR7.addEventListener('click', async ()=> {
+      const u = currentUser();
+      const name = u?.name || '';
+      const id = u?.id || '';
+      if(!name || !id) return alert('Brak danych prowadzącego. Uzupełnij profil.');
+      const c = await nextCounter();
+      const d = new Date();
+      const DD = String(d.getDate()).padStart(2,'0');
+      const MM = String(d.getMonth()+1).padStart(2,'0');
+      const YY = String(d.getFullYear()).slice(-2);
+      const XXX = String(c).padStart(3,'0');
+      const number = `R7-${XXX}-${DD}${MM}${YY}`;
+      const report = {
+        number,
+        createdAt: new Date().toISOString(),
+        createdBy: { name, id },
+        currentDriver: { name, id },
+        sectionA: { category:'', traction:'', trainNumber:'', route:'', date: d.toISOString().slice(0,10) },
+        sectionB:[], sectionC:[], sectionD:[], sectionE:[], sectionF:[], sectionG:[], r7List:[], r7Meta:{}, brakeTests:[], history:[]
+      };
+      await saveReport(report);
+      // open R7 panel directly and set currentReport
+      currentReport = report;
+      if(dashboard) dashboard.style.display='none';
+      if(r7Panel) r7Panel.style.display='block';
+      // populate general fields if present
+      if(qs('r7_trainNumber')) qs('r7_trainNumber').value = report.sectionA.trainNumber || '';
+      if(qs('r7_date')) qs('r7_date').value = report.sectionA.date || '';
+      renderR7List(report);
+    });
+  }
 
   /* ---------- Admin users table ---------- */
   async function refreshUsersTable(){
@@ -213,40 +250,46 @@ document.addEventListener('DOMContentLoaded', async () => {
     });
   }
 
-  formUser && formUser.addEventListener('submit', async (e)=>{ 
-    e.preventDefault(); userFormMsg.textContent=''; 
-    const mode=formUser.getAttribute('data-mode')||'add'; 
-    const idx=formUser.getAttribute('data-index')||''; 
-    const name=qs('u_name').value.trim(); 
-    const id=qs('u_id').value.trim(); 
-    const zdp=qs('u_zdp').value; 
-    const email=qs('u_email').value.trim(); 
-    const password=qs('u_password').value; 
-    const role=qs('u_role').value; 
-    const status=qs('u_status').value; 
-    if(!name||!id||!email||!password) return userFormMsg.textContent='Wypełnij wszystkie wymagane pola.'; 
-    try{ 
-      if(mode==='add'){ await registerUser({name,id,zdp,email,password,role,status}); } 
-      else { const patch={name,id,zdp,email,role,status}; if(password) patch.passwordHash = await hashPassword(password); await updateUser(idx,patch); } 
-      const bs=bootstrap.Modal.getInstance(modalUser); bs&&bs.hide(); formUser.reset(); await refreshUsersTable(); 
-    }catch(err){ userFormMsg.textContent = err.message||'Błąd zapisu użytkownika'; } 
-  });
+  if(formUser){
+    formUser.addEventListener('submit', async (e)=>{ 
+      e.preventDefault(); if(userFormMsg) userFormMsg.textContent=''; 
+      const mode=formUser.getAttribute('data-mode')||'add'; 
+      const idx=formUser.getAttribute('data-index')||''; 
+      const name=qs('u_name').value.trim(); 
+      const id=qs('u_id').value.trim(); 
+      const zdp=qs('u_zdp').value; 
+      const email=qs('u_email').value.trim(); 
+      const password=qs('u_password').value; 
+      const role=qs('u_role').value; 
+      const status=qs('u_status').value; 
+      if(!name||!id||!email||!password) return userFormMsg && (userFormMsg.textContent='Wypełnij wszystkie wymagane pola.'); 
+      try{ 
+        if(mode==='add'){ await registerUser({name,id,zdp,email,password,role,status}); } 
+        else { const patch={name,id,zdp,email,role,status}; if(password) patch.passwordHash = await hashPassword(password); await updateUser(idx,patch); } 
+        const bs=bootstrap.Modal.getInstance(modalUser); bs&&bs.hide(); formUser.reset(); await refreshUsersTable(); 
+      }catch(err){ userFormMsg && (userFormMsg.textContent = err.message||'Błąd zapisu użytkownika'); } 
+    });
+  }
 
-  usersTableBody && usersTableBody.addEventListener('click', async (e)=>{ 
-    const btn=e.target.closest('button'); if(!btn) return; 
-    const action=btn.getAttribute('data-action'); const key=btn.getAttribute('data-key'); 
-    if(action==='edit'){ 
-      const u=await getUserByEmailOrId(key); if(!u) return alert('Nie znaleziono użytkownika'); 
-      formUser.setAttribute('data-mode','edit'); formUser.setAttribute('data-index',key); 
-      qs('u_name').value=u.name||''; qs('u_id').value=u.id||''; qs('u_zdp').value=u.zdp||'WAW'; qs('u_email').value=u.email||''; qs('u_password').value=''; qs('u_role').value=u.role||'user'; qs('u_status').value=u.status||'active'; 
-      document.querySelector('#modalUser .modal-title').textContent='Edytuj użytkownika'; new bootstrap.Modal(modalUser).show(); 
-    } else if(action==='del'){ 
-      if(!confirm('Usunąć użytkownika?')) return; 
-      try{ await deleteUser(key); await refreshUsersTable(); }catch(err){ alert('Błąd usuwania: '+(err.message||err)); } 
-    } 
-  });
+  if(usersTableBody){
+    usersTableBody.addEventListener('click', async (e)=>{ 
+      const btn=e.target.closest('button'); if(!btn) return; 
+      const action=btn.getAttribute('data-action'); const key=btn.getAttribute('data-key'); 
+      if(action==='edit'){ 
+        const u=await getUserByEmailOrId(key); if(!u) return alert('Nie znaleziono użytkownika'); 
+        formUser.setAttribute('data-mode','edit'); formUser.setAttribute('data-index',key); 
+        qs('u_name').value=u.name||''; qs('u_id').value=u.id||''; qs('u_zdp').value=u.zdp||'WAW'; qs('u_email').value=u.email||''; qs('u_password').value=''; qs('u_role').value=u.role||'user'; qs('u_status').value=u.status||'active'; 
+        document.querySelector('#modalUser .modal-title').textContent='Edytuj użytkownika'; new bootstrap.Modal(modalUser).show(); 
+      } else if(action==='del'){ 
+        if(!confirm('Usunąć użytkownika?')) return; 
+        try{ await deleteUser(key); await refreshUsersTable(); }catch(err){ alert('Błąd usuwania: '+(err.message||err)); } 
+      } 
+    });
+  }
 
-  addUserBtn && addUserBtn.addEventListener('click', ()=>{ formUser.setAttribute('data-mode','add'); formUser.setAttribute('data-index',''); formUser.reset(); document.querySelector('#modalUser .modal-title').textContent='Dodaj użytkownika'; userFormMsg.textContent=''; });
+  if(addUserBtn){
+    addUserBtn.addEventListener('click', ()=>{ formUser.setAttribute('data-mode','add'); formUser.setAttribute('data-index',''); formUser.reset(); document.querySelector('#modalUser .modal-title').textContent='Dodaj użytkownika'; if(userFormMsg) userFormMsg.textContent=''; });
+  }
 
   /* ---------- Phonebook (fetch from GitHub raw CSV) ---------- */
   async function loadPhonebookFromGithub(){
@@ -272,7 +315,15 @@ document.addEventListener('DOMContentLoaded', async () => {
       }
     }
   }
-  function renderPhonebook(entries) { phonebookTableBody.innerHTML = ''; entries.forEach(e => { const tr = document.createElement('tr'); tr.innerHTML = `<td>${safeText(e.name)}</td><td>${safeText(e.role)}</td><td><a href="tel:${encodeURIComponent(e.number)}">${safeText(e.number)}</a></td><td>${safeText(e.hours)}</td>`; phonebookTableBody.appendChild(tr); }); }
+  function renderPhonebook(entries) { 
+    if(!phonebookTableBody) return;
+    phonebookTableBody.innerHTML = ''; 
+    entries.forEach(e => { 
+      const tr = document.createElement('tr'); 
+      tr.innerHTML = `<td>${safeText(e.name)}</td><td>${safeText(e.role)}</td><td><a href="tel:${encodeURIComponent(e.number)}">${safeText(e.number)}</a></td><td>${safeText(e.hours)}</td>`; 
+      phonebookTableBody.appendChild(tr); 
+    }); 
+  }
 
   /* ---------- Report state and helpers ---------- */
   let currentReport = null;
@@ -328,8 +379,10 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     // E - stations
     renderList('stationsList', currentReport.sectionE, (it, idx) => {
-      const arrClass = formatDelayClass(it.delayArrMinutes), depClass = formatDelayClass(it.delayDepMinutes);
-      const arrText = formatDelayText(it.delayArrMinutes), depText = formatDelayText(it.delayDepMinutes);
+      const arrClass = it.delayArrMinutes==null ? '' : (it.delayArrMinutes>0?'text-danger':(it.delayArrMinutes<0?'text-success':''));
+      const depClass = it.delayDepMinutes==null ? '' : (it.delayDepMinutes>0?'text-danger':(it.delayDepMinutes<0?'text-success':''));
+      const arrText = it.delayArrMinutes!=null?`${it.delayArrMinutes} min`:'-';
+      const depText = it.delayDepMinutes!=null?`${it.delayDepMinutes} min`:'-';
       const stopText = it.realStopMinutes!=null?`${it.realStopMinutes} min`:'-';
       const d = el('div','station-row');
       d.innerHTML = `<div class="d-flex justify-content-between">
@@ -467,7 +520,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   }
 
   /* Reset modals on hide */
-  document.querySelectorAll('.modal').forEach(m=>{ m.addEventListener('hidden.bs.modal', ()=>{ const form=m.querySelector('form'); if(form){ form.setAttribute('data-mode','add'); form.setAttribute('data-index',''); form.reset(); } }); });
+  qsa('.modal').forEach(m=>{ m.addEventListener('hidden.bs.modal', ()=>{ const form=m.querySelector('form'); if(form){ form.setAttribute('data-mode','add'); form.setAttribute('data-index',''); form.reset(); } }); });
 
   /* ---------- Modal forms for B-G ---------- */
   // Traction
@@ -508,9 +561,12 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   /* ---------- R-7: UI, drag & drop, analysis, print ---------- */
 
+  // Ensure r7List variable exists (if not present in DOM, create placeholder)
+  // (index.html should include element with id="r7List" inside r7Panel)
   function renderR7List(report){
-    if(!r7List) return;
-    r7List.innerHTML = '';
+    const container = r7List || qs('r7List');
+    if(!container) return;
+    container.innerHTML = '';
     (report.r7List||[]).forEach((v, idx) => {
       const item = document.createElement('div');
       item.className = 'list-group-item d-flex justify-content-between align-items-start';
@@ -527,13 +583,13 @@ document.addEventListener('DOMContentLoaded', async () => {
         </div>`;
       item.addEventListener('dragstart', (ev)=>{ ev.dataTransfer.setData('text/plain', idx); item.classList.add('dragging'); });
       item.addEventListener('dragend', ()=>{ item.classList.remove('dragging'); });
-      r7List.appendChild(item);
+      container.appendChild(item);
     });
-    r7List.querySelectorAll('.r7-edit').forEach(btn => btn.addEventListener('click', (e)=> {
+    container.querySelectorAll('.r7-edit').forEach(btn => btn.addEventListener('click', (e)=> {
       const idx = Number(btn.dataset.idx);
       openR7VehicleModal('edit', idx);
     }));
-    r7List.querySelectorAll('.r7-del').forEach(btn => btn.addEventListener('click', async (e)=> {
+    container.querySelectorAll('.r7-del').forEach(btn => btn.addEventListener('click', async (e)=> {
       const idx = Number(btn.dataset.idx);
       if(!currentReport) return;
       currentReport.r7List.splice(idx,1);
@@ -571,7 +627,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   }
 
   function openR7VehicleModal(mode='add', index=null, presetType=null){
-    if(!formR7Vehicle) return;
+    if(!formR7Vehicle || !modalR7Vehicle) return;
     formR7Vehicle.setAttribute('data-mode', mode);
     formR7Vehicle.setAttribute('data-index', index===null?'':String(index));
     if(mode==='add'){
@@ -598,94 +654,112 @@ document.addEventListener('DOMContentLoaded', async () => {
     new bootstrap.Modal(modalR7Vehicle).show();
   }
 
-  formR7Vehicle && formR7Vehicle.addEventListener('submit', async (e)=> {
-    e.preventDefault();
-    if(!currentReport) { alert('Brak otwartego wykazu. Otwórz lub utwórz raport.'); return; }
-    const mode = formR7Vehicle.getAttribute('data-mode') || 'add';
-    const idx = formR7Vehicle.getAttribute('data-index');
-    const v = {
-      type: qs('v_type').value,
-      evn: qs('v_evn').value.trim(),
-      country: qs('v_country').value,
-      operator: qs('v_operator').value,
-      operator_code: qs('v_operator_code').value.trim(),
-      series: qs('v_series').value.trim(),
-      length: round2(toNumber(qs('v_length').value)),
-      payload: round2(toNumber(qs('v_payload').value)),
-      empty_mass: round2(toNumber(qs('v_empty_mass').value)),
-      brake_mass: round2(toNumber(qs('v_brake_mass').value)),
-      brake_type: qs('v_brake_type').value,
-      from: qs('v_from').value.trim(),
-      to: qs('v_to').value.trim(),
-      notes: qs('v_notes').value.trim()
-    };
-    if(mode==='edit' && idx!==''){
-      currentReport.r7List[Number(idx)] = v;
-    } else {
-      currentReport.r7List.push(v);
-    }
-    await saveReport(currentReport);
-    // close modal using bootstrap API to ensure X and Anuluj work
-    const bs = bootstrap.Modal.getInstance(modalR7Vehicle);
-    bs && bs.hide();
-    renderR7List(currentReport);
-  });
+  if(formR7Vehicle){
+    formR7Vehicle.addEventListener('submit', async (e)=> {
+      e.preventDefault();
+      if(!currentReport) { alert('Brak otwartego wykazu. Otwórz lub utwórz raport.'); return; }
+      const mode = formR7Vehicle.getAttribute('data-mode') || 'add';
+      const idx = formR7Vehicle.getAttribute('data-index');
+      const v = {
+        type: qs('v_type').value,
+        evn: qs('v_evn').value.trim(),
+        country: qs('v_country').value,
+        operator: qs('v_operator').value,
+        operator_code: qs('v_operator_code').value.trim(),
+        series: qs('v_series').value.trim(),
+        length: round2(toNumber(qs('v_length').value)),
+        payload: round2(toNumber(qs('v_payload').value)),
+        empty_mass: round2(toNumber(qs('v_empty_mass').value)),
+        brake_mass: round2(toNumber(qs('v_brake_mass').value)),
+        brake_type: qs('v_brake_type').value,
+        from: qs('v_from').value.trim(),
+        to: qs('v_to').value.trim(),
+        notes: qs('v_notes').value.trim()
+      };
+      if(mode==='edit' && idx!==''){
+        currentReport.r7List[Number(idx)] = v;
+      } else {
+        currentReport.r7List.push(v);
+      }
+      await saveReport(currentReport);
+      // close modal using bootstrap API to ensure X and Anuluj work
+      const bs = bootstrap.Modal.getInstance(modalR7Vehicle);
+      bs && bs.hide();
+      renderR7List(currentReport);
+    });
+  }
 
-  r7_addLocomotive && r7_addLocomotive.addEventListener('click', ()=> openR7VehicleModal('add', null, 'locomotive'));
-  r7_addWagon && r7_addWagon.addEventListener('click', ()=> openR7VehicleModal('add', null, 'wagon'));
+  if(r7_addLocomotive) r7_addLocomotive.addEventListener('click', ()=> openR7VehicleModal('add', null, 'locomotive'));
+  if(r7_addWagon) r7_addWagon.addEventListener('click', ()=> openR7VehicleModal('add', null, 'wagon'));
 
-  r7_analyze && r7_analyze.addEventListener('click', ()=> {
-    if(!currentReport) { alert('Otwórz raport, aby przeprowadzić analizę.'); return; }
-    const list = currentReport.r7List || [];
-    const totalLength = round2(list.reduce((s,v)=> s + toNumber(v.length), 0));
-    const massWagons = round2(list.filter(v=>v.type==='wagon').reduce((s,v)=> s + toNumber(v.empty_mass) + toNumber(v.payload), 0));
-    const massLocos = round2(list.filter(v=>v.type==='locomotive').reduce((s,v)=> s + toNumber(v.empty_mass) + toNumber(v.payload), 0));
-    const massTotal = round2(massWagons + massLocos);
-    const brakeWagons = round2(list.filter(v=>v.type==='wagon').reduce((s,v)=> s + toNumber(v.brake_mass), 0));
-    const brakeLocos = round2(list.filter(v=>v.type==='locomotive').reduce((s,v)=> s + toNumber(v.brake_mass), 0));
-    const brakeTotal = round2(brakeWagons + brakeLocos);
-    const pctWagons = massWagons>0 ? round2((brakeWagons / massWagons) * 100) : 0;
-    const pctTotal = massTotal>0 ? round2((brakeTotal / massTotal) * 100) : 0;
+  if(r7_analyze){
+    r7_analyze.addEventListener('click', ()=> {
+      if(!currentReport) { alert('Otwórz raport, aby przeprowadzić analizę.'); return; }
+      const list = currentReport.r7List || [];
+      const totalLength = round2(list.reduce((s,v)=> s + toNumber(v.length), 0));
+      const massWagons = round2(list.filter(v=>v.type==='wagon').reduce((s,v)=> s + toNumber(v.empty_mass) + toNumber(v.payload), 0));
+      const massLocos = round2(list.filter(v=>v.type==='locomotive').reduce((s,v)=> s + toNumber(v.empty_mass) + toNumber(v.payload), 0));
+      const massTotal = round2(massWagons + massLocos);
+      const brakeWagons = round2(list.filter(v=>v.type==='wagon').reduce((s,v)=> s + toNumber(v.brake_mass), 0));
+      const brakeLocos = round2(list.filter(v=>v.type==='locomotive').reduce((s,v)=> s + toNumber(v.brake_mass), 0));
+      const brakeTotal = round2(brakeWagons + brakeLocos);
+      const pctWagons = massWagons>0 ? round2((brakeWagons / massWagons) * 100) : 0;
+      const pctTotal = massTotal>0 ? round2((brakeTotal / massTotal) * 100) : 0;
 
-    currentReport._analysis = { length: totalLength, massWagons, massTotal, brakeWagons, brakeTotal, pctWagons, pctTotal };
+      currentReport._analysis = { length: totalLength, massWagons, massTotal, brakeWagons, brakeTotal, pctWagons, pctTotal };
 
-    if(r7Results) r7Results.style.display = 'block';
-    qs('res_length') && (qs('res_length').textContent = `${totalLength}`);
-    qs('res_mass_wagons') && (qs('res_mass_wagons').textContent = `${massWagons}`);
-    qs('res_mass_total') && (qs('res_mass_total').textContent = `${massTotal}`);
-    qs('res_brake_wagons') && (qs('res_brake_wagons').textContent = `${brakeWagons}`);
-    qs('res_brake_total') && (qs('res_brake_total').textContent = `${brakeTotal}`);
-    qs('res_pct_wagons') && (qs('res_pct_wagons').textContent = `${pctWagons}`);
-    qs('res_pct_total') && (qs('res_pct_total').textContent = `${pctTotal}`);
+      if(r7Results) r7Results.style.display = 'block';
+      if(qs('res_length')) qs('res_length').textContent = `${totalLength}`;
+      if(qs('res_mass_wagons')) qs('res_mass_wagons').textContent = `${massWagons}`;
+      if(qs('res_mass_total')) qs('res_mass_total').textContent = `${massTotal}`;
+      if(qs('res_brake_wagons')) qs('res_brake_wagons').textContent = `${brakeWagons}`;
+      if(qs('res_brake_total')) qs('res_brake_total').textContent = `${brakeTotal}`;
+      if(qs('res_pct_wagons')) qs('res_pct_wagons').textContent = `${pctWagons}`;
+      if(qs('res_pct_total')) qs('res_pct_total').textContent = `${pctTotal}`;
 
-    saveReport(currentReport);
-  });
+      saveReport(currentReport);
+    });
+  }
 
-  r7_print_pdf && r7_print_pdf.addEventListener('click', async ()=> {
-    if(!currentReport) return alert('Brak otwartego wykazu.');
-    currentReport.r7Meta = {
-      from: qs('r7_from')?.value || '',
-      to: qs('r7_to')?.value || '',
-      driver: qs('r7_driver')?.value || '',
-      conductor: qs('r7_conductor')?.value || ''
-    };
-    currentReport.sectionA = currentReport.sectionA || {};
-    currentReport.sectionA.trainNumber = qs('r7_trainNumber')?.value || currentReport.sectionA.trainNumber || '';
-    currentReport.sectionA.date = qs('r7_date')?.value || currentReport.sectionA.date || '';
-    await saveReport(currentReport);
-    await exportR7Pdf(currentReport, `${(currentReport.number||'R7').replace(/\//g,'-')}.pdf`);
-  });
+  if(r7_print_pdf){
+    r7_print_pdf.addEventListener('click', async ()=> {
+      if(!currentReport) return alert('Brak otwartego wykazu.');
+      currentReport.r7Meta = {
+        from: qs('r7_from')?.value || '',
+        to: qs('r7_to')?.value || '',
+        driver: qs('r7_driver')?.value || '',
+        conductor: qs('r7_conductor')?.value || ''
+      };
+      currentReport.sectionA = currentReport.sectionA || {};
+      currentReport.sectionA.trainNumber = qs('r7_trainNumber')?.value || currentReport.sectionA.trainNumber || '';
+      currentReport.sectionA.date = qs('r7_date')?.value || currentReport.sectionA.date || '';
+      // ensure analysis up to date
+      const list = currentReport.r7List || [];
+      const totalLength = round2(list.reduce((s,v)=> s + toNumber(v.length), 0));
+      const massWagons = round2(list.filter(v=>v.type==='wagon').reduce((s,v)=> s + toNumber(v.empty_mass) + toNumber(v.payload), 0));
+      const massLocos = round2(list.filter(v=>v.type==='locomotive').reduce((s,v)=> s + toNumber(v.empty_mass) + toNumber(v.payload), 0));
+      const massTotal = round2(massWagons + massLocos);
+      const brakeWagons = round2(list.filter(v=>v.type==='wagon').reduce((s,v)=> s + toNumber(v.brake_mass), 0));
+      const brakeLocos = round2(list.filter(v=>v.type==='locomotive').reduce((s,v)=> s + toNumber(v.brake_mass), 0));
+      const brakeTotal = round2(brakeWagons + brakeLocos);
+      const pctWagons = massWagons>0 ? round2((brakeWagons / massWagons) * 100) : 0;
+      const pctTotal = massTotal>0 ? round2((brakeTotal / massTotal) * 100) : 0;
+      currentReport._analysis = { length: totalLength, massWagons, massTotal, brakeWagons, brakeTotal, pctWagons, pctTotal };
+      await saveReport(currentReport);
+      await exportR7Pdf(currentReport, `${(currentReport.number||'R7').replace(/\//g,'-')}.pdf`);
+    });
+  }
 
   /* ---------- Open Report UI (build full A-G UI + R7 integration) ---------- */
   function openReportUI(report) {
     currentReport = report;
-    dashboard.style.display = 'none';
-    handleTrainMenu.style.display = 'none';
-    takeOverMenu.style.display = 'none';
-    adminPanel.style.display = 'none';
-    phonebookPanel.style.display = 'none';
+    if(dashboard) dashboard.style.display = 'none';
+    if(handleTrainMenu) handleTrainMenu.style.display = 'none';
+    if(takeOverMenu) takeOverMenu.style.display = 'none';
+    if(adminPanel) adminPanel.style.display = 'none';
+    if(phonebookPanel) phonebookPanel.style.display = 'none';
     if(r7Panel) r7Panel.style.display = 'none';
-    reportPanelContainer.style.display = 'block';
+    if(reportPanelContainer) reportPanelContainer.style.display = 'block';
     reportPanelContainer.innerHTML = '';
 
     const card = el('div','card p-3 mb-3');
@@ -735,22 +809,22 @@ document.addEventListener('DOMContentLoaded', async () => {
     reportPanelContainer.appendChild(card);
 
     // populate fields
-    qs('r_cat').value = report.sectionA?.category || '';
-    qs('r_traction').value = report.sectionA?.traction || '';
-    qs('r_trainNumber').value = report.sectionA?.trainNumber || '';
-    qs('r_route').value = report.sectionA?.route || '';
-    qs('r_date').value = report.sectionA?.date || '';
+    if(qs('r_cat')) qs('r_cat').value = report.sectionA?.category || '';
+    if(qs('r_traction')) qs('r_traction').value = report.sectionA?.traction || '';
+    if(qs('r_trainNumber')) qs('r_trainNumber').value = report.sectionA?.trainNumber || '';
+    if(qs('r_route')) qs('r_route').value = report.sectionA?.route || '';
+    if(qs('r_date')) qs('r_date').value = report.sectionA?.date || '';
 
     // header buttons
-    qs('rp_back').addEventListener('click', ()=>{ reportPanelContainer.style.display='none'; dashboard.style.display='block'; });
-    qs('rp_home').addEventListener('click', ()=>{ reportPanelContainer.style.display='none'; dashboard.style.display='block'; });
+    qs('rp_back').addEventListener('click', ()=>{ reportPanelContainer.style.display='none'; if(dashboard) dashboard.style.display='block'; });
+    qs('rp_home').addEventListener('click', ()=>{ reportPanelContainer.style.display='none'; if(dashboard) dashboard.style.display='block'; });
     qs('rp_open_r7').addEventListener('click', ()=> {
-      qs('r7_trainNumber') && (qs('r7_trainNumber').value = report.sectionA?.trainNumber || '');
-      qs('r7_date') && (qs('r7_date').value = report.sectionA?.date || '');
-      qs('r7_from') && (qs('r7_from').value = report.r7Meta?.from || '');
-      qs('r7_to') && (qs('r7_to').value = report.r7Meta?.to || '');
-      qs('r7_driver') && (qs('r7_driver').value = report.r7Meta?.driver || '');
-      qs('r7_conductor') && (qs('r7_conductor').value = report.r7Meta?.conductor || '');
+      if(qs('r7_trainNumber')) qs('r7_trainNumber').value = report.sectionA?.trainNumber || '';
+      if(qs('r7_date')) qs('r7_date').value = report.sectionA?.date || '';
+      if(qs('r7_from')) qs('r7_from').value = report.r7Meta?.from || '';
+      if(qs('r7_to')) qs('r7_to').value = report.r7Meta?.to || '';
+      if(qs('r7_driver')) qs('r7_driver').value = report.r7Meta?.driver || '';
+      if(qs('r7_conductor')) qs('r7_conductor').value = report.r7Meta?.conductor || '';
       reportPanelContainer.style.display='none';
       if(r7Panel) r7Panel.style.display='block';
       renderR7List(report);
@@ -852,6 +926,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         <tr><th>Data kursu</th><td>${safeText(currentReport.sectionA.date)}</td></tr>
       </tbody></table>`;
       container.appendChild(secAprint);
+      // crew tables and other sections (simple rendering)
       const makeCrewTable = (title, arr, cols) => {
         const s = document.createElement('div'); s.className='section';
         s.innerHTML = `<h6>${title}</h6>`;
@@ -865,6 +940,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       };
       container.appendChild(makeCrewTable('B - Drużyna trakcyjna', currentReport.sectionB, ['name','id','zdp','loco','from','to']));
       container.appendChild(makeCrewTable('C - Drużyna konduktorska', currentReport.sectionC, ['name','id','zdp','role','from','to']));
+      // D, E, F, G simplified
       const secDprint = document.createElement('div'); secDprint.className = 'section'; secDprint.innerHTML = `<h6>D - Dyspozycje</h6>`;
       if((currentReport.sectionD||[]).length===0) secDprint.innerHTML += `<div>-</div>`; else {
         const t = document.createElement('table'); t.className='table-print';
