@@ -28,7 +28,7 @@ export async function exportPdf(elementOrHtml, filename = 'document.pdf') {
 /**
  * Generuje PDF zgodny wizualnie z formularzem R-7:
  * - tabela zawiera dokładnie tyle wierszy, ile pojazdów w report.r7List
- * - w wierszu H1 sumowane są kolumny mas (masa ładunku, masa własna, masa hamująca)
+ * - w wierszu H1 sumowane są kolumny masowe oraz długość pojazdów
  * - podsumowanie analizy umieszczone jest na osobnej stronie
  *
  * @param {Object} report - obiekt raportu zawierający report.r7List (tablica pojazdów) i report._analysis (opcjonalnie)
@@ -38,7 +38,8 @@ export async function exportR7Pdf(report, filename = 'R7.pdf') {
   const meta = report.r7Meta || {};
   const rows = Array.isArray(report.r7List) ? report.r7List : [];
 
-  // Obliczenia sum dla H1 (tylko kolumny masowe)
+  // Obliczenia sum dla H1 (długość + kolumny masowe)
+  const sumLength = round2(rows.reduce((s, r) => s + toNumber(r.length), 0));
   const sumPayload = round2(rows.reduce((s, r) => s + toNumber(r.payload), 0));
   const sumEmpty = round2(rows.reduce((s, r) => s + toNumber(r.empty_mass), 0));
   const sumBrake = round2(rows.reduce((s, r) => s + toNumber(r.brake_mass), 0));
@@ -46,26 +47,27 @@ export async function exportR7Pdf(report, filename = 'R7.pdf') {
   // Analiza (jeśli już obliczona w raporcie, użyj jej; inaczej oblicz podstawowe wartości)
   const analysis = report._analysis || computeBasicAnalysis(rows);
 
-  // Budujemy HTML: strona 1 = tabela R-7; strona 2 = podsumowanie analizy
+  // Styl ogólny: zbliżony do formularza R-7
   const html = `
   <div style="font-family: Arial, Helvetica, sans-serif; color:#111;">
 
     <!-- STRONA 1: Wykaz R-7 -->
     <div style="width:100%; padding:10px; box-sizing:border-box;">
-      <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:8px;">
-        <div style="font-weight:700; font-size:14px;">Wykaz pojazdów kolejowych w składzie pociągu (R-7)</div>
-        <div style="text-align:right; font-size:11px; color:#333;">
+      <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:6px;">
+        <div style="font-weight:700; font-size:15px;">Wykaz pojazdów kolejowych w składzie pociągu (R-7)</div>
+        <div style="text-align:right; font-size:10.5px; color:#333;">
           <div>Nr dokumentu: <strong>${escapeHtml(report.number || '')}</strong></div>
           <div>Data wydruku: ${new Date().toLocaleString()}</div>
         </div>
       </div>
 
+      <!-- Dane ogólne (nagłówek formularza) -->
       <table style="width:100%; border-collapse:collapse; margin-bottom:8px; font-size:11px;">
         <tr>
-          <td style="padding:6px; border:1px solid #333; width:20%"><strong>Nr pociągu:</strong> ${escapeHtml(report.sectionA?.trainNumber || '')}</td>
+          <td style="padding:6px; border:1px solid #333; width:25%"><strong>Nr pociągu:</strong> ${escapeHtml(report.sectionA?.trainNumber || '')}</td>
           <td style="padding:6px; border:1px solid #333; width:25%"><strong>Wyprawiony dnia:</strong> ${escapeHtml(report.sectionA?.date || '')}</td>
-          <td style="padding:6px; border:1px solid #333; width:27%"><strong>Ze stacji:</strong> ${escapeHtml(meta.from || '')}</td>
-          <td style="padding:6px; border:1px solid #333; width:28%"><strong>Do stacji:</strong> ${escapeHtml(meta.to || '')}</td>
+          <td style="padding:6px; border:1px solid #333; width:25%"><strong>Ze stacji:</strong> ${escapeHtml(meta.from || '')}</td>
+          <td style="padding:6px; border:1px solid #333; width:25%"><strong>Do stacji:</strong> ${escapeHtml(meta.to || '')}</td>
         </tr>
         <tr>
           <td style="padding:6px; border:1px solid #333;"><strong>Maszynista:</strong> ${escapeHtml(meta.driver || '')}</td>
@@ -118,7 +120,8 @@ export async function exportR7Pdf(report, filename = 'R7.pdf') {
             <td style="border:1px solid #333; padding:6px; text-align:right;"><strong>${formatNumber(sumPayload)}</strong></td>
             <td style="border:1px solid #333; padding:6px; text-align:right;"><strong>${formatNumber(sumEmpty)}</strong></td>
             <td style="border:1px solid #333; padding:6px; text-align:right;"><strong>${formatNumber(sumBrake)}</strong></td>
-            <td colspan="3" style="border:1px solid #333; padding:6px;"></td>
+            <td style="border:1px solid #333; padding:6px; text-align:right;"><strong>${formatNumber(sumLength)}</strong></td>
+            <td colspan="2" style="border:1px solid #333; padding:6px;"></td>
           </tr>
         </tfoot>
       </table>
@@ -133,7 +136,7 @@ export async function exportR7Pdf(report, filename = 'R7.pdf') {
       <div style="font-weight:700; font-size:13px; margin-bottom:8px;">Podsumowanie analizy</div>
       <table style="width:100%; border-collapse:collapse; font-size:11px;">
         <tbody>
-          <tr><th style="text-align:left; padding:6px; border:1px solid #ddd; width:50%;">Długość składu (m)</th><td style="padding:6px; border:1px solid #ddd; text-align:right;">${analysis.length ?? '-'}</td></tr>
+          <tr><th style="text-align:left; padding:6px; border:1px solid #ddd; width:60%;">Długość składu (m)</th><td style="padding:6px; border:1px solid #ddd; text-align:right;">${analysis.length ?? '-'}</td></tr>
           <tr><th style="text-align:left; padding:6px; border:1px solid #ddd;">Masa składu (wagony) (t)</th><td style="padding:6px; border:1px solid #ddd; text-align:right;">${analysis.massWagons ?? '-'}</td></tr>
           <tr><th style="text-align:left; padding:6px; border:1px solid #ddd;">Masa pociągu (lokomotywy + wagony) (t)</th><td style="padding:6px; border:1px solid #ddd; text-align:right;">${analysis.massTotal ?? '-'}</td></tr>
           <tr><th style="text-align:left; padding:6px; border:1px solid #ddd;">Masa hamująca składu (wagony) (t)</th><td style="padding:6px; border:1px solid #ddd; text-align:right;">${analysis.brakeWagons ?? '-'}</td></tr>
