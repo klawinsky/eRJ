@@ -1,66 +1,85 @@
 // js/auth.js
-import { getUserByEmailOrId, seedAdminIfMissing, saveUser } from './db.js';
+// Prosty mechanizm autoryzacji dla demo.
+// Hasła są hashowane i przechowywane w localStorage (nie produkcyjne).
 
-export async function hashPassword(password) {
-  const enc = new TextEncoder();
-  const data = enc.encode(password);
-  const hashBuffer = await crypto.subtle.digest('SHA-256', data);
-  const hashArray = Array.from(new Uint8Array(hashBuffer));
-  return hashArray.map(b => b.toString(16).padStart(2,'0')).join('');
+const LS_AUTH = 'erj_auth_v1';
+const LS_USERS = 'erj_users_v1';
+const LS_SESS = 'erj_session_v1';
+
+// Domyślny admin (seed). Możesz zmienić wartości przed pierwszym uruchomieniem.
+const ADMIN_EMAIL = 'klawinski.pawel@gmail.com';
+const ADMIN_ID = '77144';
+const ADMIN_PLAIN = 'Admin@77144';
+
+function read(key, def) {
+  try { const v = localStorage.getItem(key); return v ? JSON.parse(v) : def; } catch { return def; }
 }
+function write(key, val) { localStorage.setItem(key, JSON.stringify(val)); }
 
-const AUTH_KEY = 'erj_current_user';
-const AUTH_PERSIST_KEY = 'erj_current_user_persist';
+async function ensureSeed() {
+  const users = read(LS_USERS, []);
+  const auth = read(LS_AUTH, {});
+  // Dodaj użytkownika admin jeśli nie istnieje
+  if (!users.find(u => u.email === ADMIN_EMAIL)) {
+    users.push({ name: 'Paweł Klawiński', id: ADMIN_ID, zdp: 'WAW', email: ADMIN_EMAIL, role: 'admin', status: 'active' });
+    write(LS_USERS, users);
+  }
+  // Zasiej hasło admina jeśli nie ma
+  if (!auth[ADMIN_EMAIL]) {
+    auth[ADMIN_EMAIL] = await hashPassword(ADMIN_PLAIN);
+    write(LS_AUTH, auth);
+  }
+}
 
 export async function initAuth() {
-  const adminPlain = 'Admin@77144';
-  const admin = {
-    name: 'Paweł Klawiński',
-    id: '77144',
-    zdp: 'WAW',
-    role: 'admin',
-    status: 'active',
-    email: 'klawinski.pawel@gmail.com',
-  };
-  const hash = await hashPassword(adminPlain);
-  admin.passwordHash = hash;
-  await seedAdminIfMissing(admin);
-  return adminPlain;
+  await ensureSeed();
+  // Zwracamy plain demo hasło, ułatwia przycisk "Demo" w UI
+  return ADMIN_PLAIN;
 }
 
-export async function registerUser({ name, id, zdp, email, password, role='user', status='active' }) {
-  const passwordHash = await hashPassword(password);
-  const user = { name, id, zdp, email, role, status, passwordHash };
-  await saveUser(user);
-  return user;
+/* Rejestracja użytkownika: zapis metadanych w users i hash hasła w auth */
+export async function registerUser({ name, id, zdp, email, password, role, status }) {
+  const users = read(LS_USERS, []);
+  if (users.find(u => u.email === email || u.id === id)) throw new Error('Użytkownik już istnieje');
+  users.push({ name, id, zdp, email, role: role || 'user', status: status || 'active' });
+  write(LS_USERS, users);
+  const auth = read(LS_AUTH, {});
+  auth[email] = await hashPassword(password);
+  write(LS_AUTH, auth);
+  return true;
 }
 
-export async function login(loginId, password, remember=false) {
-  const user = await getUserByEmailOrId(loginId);
-  if (!user) return { ok:false, reason:'Nie znaleziono użytkownika' };
-  if (user.status !== 'active') return { ok:false, reason:'Konto nieaktywne' };
-  const hash = await hashPassword(password);
-  if (hash !== user.passwordHash) return { ok:false, reason:'Nieprawidłowe hasło' };
-  const session = { email: user.email, id: user.id, name: user.name, role: user.role, zdp: user.zdp, loggedAt: new Date().toISOString() };
-  // store session: if remember true -> persist key, else store ephemeral
-  localStorage.setItem(AUTH_KEY, JSON.stringify(session));
-  if (remember) localStorage.setItem(AUTH_PERSIST_KEY, JSON.stringify(session));
-  else localStorage.removeItem(AUTH_PERSIST_KEY);
-  return { ok:true, user: session };
+/* Logowanie: akceptuje email lub numer służbowy */
+export async function login(idOrEmail, password, remember = false) {
+  const users = read(LS_USERS, []);
+  const user = users.find(u => u.email === idOrEmail || u.id === idOrEmail);
+  if (!user) return { ok: false, reason: 'Nieprawidłowy login' };
+  const auth = read(LS_AUTH, {});
+  const hash = auth[user.email];
+  if (!hash) return { ok: false, reason: 'Brak hasła' };
+  const pwHash = await hashPassword(password);
+  if (pwHash !== hash) return { ok: false, reason: 'Nieprawidłowe hasło' };
+  const session = { user, at: new Date().toISOString() };
+  if (remember) localStorage.setItem(LS_SESS, JSON.stringify(session)); else sessionStorage.setItem(LS_SESS, JSON.stringify(session));
+  return { ok: true, user };
 }
 
 export function logout() {
-  localStorage.removeItem(AUTH_KEY);
-  localStorage.removeItem(AUTH_PERSIST_KEY);
+  localStorage.removeItem(LS_SESS);
+  sessionStorage.removeItem(LS_SESS);
 }
 
 export function currentUser() {
-  // if persistent session exists, restore it to AUTH_KEY
-  const persist = localStorage.getItem(AUTH_PERSIST_KEY);
-  if (persist && !localStorage.getItem(AUTH_KEY)) {
-    localStorage.setItem(AUTH_KEY, persist);
-  }
-  const raw = localStorage.getItem(AUTH_KEY);
-  if (!raw) return null;
-  try { return JSON.parse(raw); } catch (e) { return null; }
+  const s = sessionStorage.getItem(LS_SESS) || localStorage.getItem(LS_SESS);
+  if (!s) return null;
+  try { const obj = JSON.parse(s); return obj.user; } catch { return null; }
+}
+
+/* Proste hashowanie SHA-256 (nie produkcyjne, ale wystarczające do demo) */
+export async function hashPassword(pw) {
+  const enc = new TextEncoder();
+  const data = enc.encode((pw || '') + '::erj_salt_v1');
+  const buf = await crypto.subtle.digest('SHA-256', data);
+  const hex = Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2, '0')).join('');
+  return hex;
 }
