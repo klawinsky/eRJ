@@ -1,17 +1,14 @@
 // js/app.js
-// Samodzielny, kompletny skrypt obsługi nawigacji, raportów i R-7.
-// Przechowuje dane w localStorage pod kluczami: erj_reports, erj_r7lists
+// Stabilna, kompletna logika aplikacji (lokalny storage).
+// Obsługa: logowanie demo, dashboard, Obsłuż pociąg (Nowy raport, Nowy R-7),
+// Przejmij pociąg (wyszukaj/otwórz), Książka telefoniczna.
 
-/* ---------- Helpers ---------- */
 const qs = id => document.getElementById(id);
 const el = (tag, cls) => { const d = document.createElement(tag); if (cls) d.className = cls; return d; };
 const nowISO = () => new Date().toISOString();
 const uid = (p='id') => `${p}_${Date.now()}_${Math.floor(Math.random()*1000)}`;
 
-/* ---------- Local storage simple DB ---------- */
-function read(key, def = []) {
-  try { const v = localStorage.getItem(key); return v ? JSON.parse(v) : def; } catch(e) { return def; }
-}
+function read(key, def = []) { try { const v = localStorage.getItem(key); return v ? JSON.parse(v) : def; } catch(e) { return def; } }
 function write(key, val) { localStorage.setItem(key, JSON.stringify(val)); }
 
 function listReports() { return read('erj_reports', []); }
@@ -39,8 +36,13 @@ function saveR7(listObj) {
   write('erj_r7lists', arr);
 }
 
-/* ---------- UI refs ---------- */
 document.addEventListener('DOMContentLoaded', () => {
+  // Login UI
+  const loginView = qs('loginView'), appShell = qs('appShell');
+  const loginForm = qs('loginForm'), loginId = qs('loginId'), loginPassword = qs('loginPassword'), loginMsg = qs('loginMsg'), demoBtn = qs('demoBtn');
+  const loggedUserInfo = qs('loggedUserInfo'), btnLogout = qs('btnLogout'), btnHome = qs('btnHome');
+
+  // Panels
   const dashboard = qs('dashboard');
   const handleTrainMenu = qs('handleTrainMenu');
   const takeOverMenu = qs('takeOverMenu');
@@ -48,24 +50,22 @@ document.addEventListener('DOMContentLoaded', () => {
   const r7CreatePanel = qs('r7CreatePanel');
   const phonebookPanel = qs('phonebookPanel');
 
-  // dashboard tiles
+  // Tiles and buttons
   const tileHandleTrain = qs('tileHandleTrain');
   const tileTakeOver = qs('tileTakeOver');
   const tilePhonebook = qs('tilePhonebook');
 
-  // handleTrain buttons
   const backFromHandle = qs('backFromHandle');
   const homeFromHandle = qs('homeFromHandle');
   const btnNewReport = qs('btnNewReport');
   const btnNewR7 = qs('btnNewR7');
 
-  // takeover buttons
   const btnTakeoverReport = qs('btnTakeoverReport');
   const btnTakeoverR7 = qs('btnTakeoverR7');
   const backFromTakeover = qs('backFromTakeover');
   const homeFromTakeover = qs('homeFromTakeover');
 
-  // report panel elements
+  // Report elements
   const rp_back = qs('rp_back');
   const rp_home = qs('rp_home');
   const rp_trainNumber = qs('rp_trainNumber');
@@ -76,7 +76,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const rp_export = qs('rp_export');
   const reportsList = qs('reportsList');
 
-  // r7 panel elements
+  // R7 elements
   const r7_back = qs('r7_back');
   const r7_home = qs('r7_home');
   const r7_train = qs('r7_train');
@@ -88,22 +88,75 @@ document.addEventListener('DOMContentLoaded', () => {
   const r7_save = qs('r7_save');
   const r7Items = qs('r7Items');
 
-  // phonebook
+  // Phonebook
   const backFromPhonebook = qs('backFromPhonebook');
   const homeFromPhonebook = qs('homeFromPhonebook');
   const phonebookBody = qs('phonebookBody');
 
-  // navigation helpers
+  // Session helpers
   function show(elm) { if(!elm) return; elm.classList.remove('hidden'); }
   function hide(elm) { if(!elm) return; elm.classList.add('hidden'); }
   function showOnly(elm) {
     [dashboard, handleTrainMenu, takeOverMenu, reportPanel, r7CreatePanel, phonebookPanel].forEach(x => { if(!x) return; if(x===elm) show(x); else hide(x); });
   }
 
-  // initial state
-  showOnly(dashboard);
+  // Simple auth: demo admin password stored in localStorage for convenience
+  function initAuth() {
+    if (!localStorage.getItem('erj_demo_admin_pw')) {
+      localStorage.setItem('erj_demo_admin_pw', 'admin123');
+      localStorage.setItem('erj_demo_admin_user', JSON.stringify({ id:'admin', name:'Administrator', role:'admin' }));
+    }
+  }
+  initAuth();
 
-  /* ---------- Dashboard navigation ---------- */
+  function currentUser() {
+    try { return JSON.parse(sessionStorage.getItem('erj_user') || 'null'); } catch(e) { return null; }
+  }
+  function setCurrentUser(u) { sessionStorage.setItem('erj_user', JSON.stringify(u)); }
+
+  // On load show login
+  show(loginView); hide(appShell);
+  const sess = currentUser();
+  if (sess) {
+    hide(loginView); show(appShell); if (loggedUserInfo) loggedUserInfo.textContent = `${sess.name} (${sess.id}) · ${sess.role}`; showOnly(dashboard);
+  }
+
+  // Login handlers
+  if (loginForm) {
+    loginForm.addEventListener('submit', (e) => {
+      e.preventDefault();
+      const id = loginId.value.trim();
+      const pw = loginPassword.value;
+      const demoPw = localStorage.getItem('erj_demo_admin_pw');
+      if (!id || !pw) { loginMsg.textContent = 'Podaj login i hasło.'; return; }
+      if (id === 'admin' && pw === demoPw) {
+        const u = { id:'admin', name:'Administrator', role:'admin' };
+        setCurrentUser(u);
+        hide(loginView); show(appShell); if (loggedUserInfo) loggedUserInfo.textContent = `${u.name} (${u.id}) · ${u.role}`; showOnly(dashboard);
+        loginMsg.textContent = '';
+        return;
+      }
+      // simple fallback: accept any non-empty credentials as user
+      const u = { id, name: id, role: 'user' };
+      setCurrentUser(u);
+      hide(loginView); show(appShell); if (loggedUserInfo) loggedUserInfo.textContent = `${u.name} (${u.id}) · ${u.role}`; showOnly(dashboard);
+      loginMsg.textContent = '';
+    });
+  }
+
+  if (demoBtn) demoBtn.addEventListener('click', () => {
+    loginId.value = 'admin'; loginPassword.value = localStorage.getItem('erj_demo_admin_pw') || 'admin123';
+    loginForm && loginForm.dispatchEvent(new Event('submit', { cancelable:true }));
+  });
+
+  if (btnLogout) btnLogout.addEventListener('click', () => {
+    sessionStorage.removeItem('erj_user');
+    show(loginView); hide(appShell);
+  });
+
+  if (btnHome) btnHome.addEventListener('click', () => { showOnly(dashboard); });
+
+  // Dashboard navigation
   tileHandleTrain && tileHandleTrain.addEventListener('click', () => { showOnly(handleTrainMenu); });
   backFromHandle && backFromHandle.addEventListener('click', () => { showOnly(dashboard); });
   homeFromHandle && homeFromHandle.addEventListener('click', () => { showOnly(dashboard); });
@@ -116,41 +169,33 @@ document.addEventListener('DOMContentLoaded', () => {
   backFromPhonebook && backFromPhonebook.addEventListener('click', () => { showOnly(dashboard); });
   homeFromPhonebook && homeFromPhonebook.addEventListener('click', () => { showOnly(dashboard); });
 
-  /* ---------- New Report flow ---------- */
+  /* ---------- New Report ---------- */
   btnNewReport && btnNewReport.addEventListener('click', () => {
-    // create empty report and open report panel for editing
     const id = uid('report');
     const number = nextReportNumber();
-    const report = {
-      id, number, createdAt: nowISO(), trainNumber: '', date: new Date().toISOString().slice(0,10),
-      driver: '', conductor: '', notes: '', r7Id: null
-    };
+    const report = { id, number, createdAt: nowISO(), trainNumber:'', date: new Date().toISOString().slice(0,10), driver:'', conductor:'', notes:'' };
     saveReport(report);
     openReportEditor(report.id);
   });
 
-  // open report editor by id
   function openReportEditor(reportId) {
-    const reports = listReports();
-    const rep = reports.find(r => r.id === reportId);
+    const arr = listReports();
+    const rep = arr.find(r => r.id === reportId);
     if (!rep) { alert('Nie znaleziono raportu'); return; }
-    // populate fields
     rp_trainNumber.value = rep.trainNumber || rep.number || '';
     rp_date.value = rep.date || '';
     rp_driver.value = rep.driver || '';
     rp_conductor.value = rep.conductor || '';
-    // store current id on panel element
     reportPanel.setAttribute('data-current-id', rep.id);
-    renderReportsList(); // show history
+    renderReportsList();
     showOnly(reportPanel);
   }
 
-  // save report
   rp_save && rp_save.addEventListener('click', () => {
     const id = reportPanel.getAttribute('data-current-id');
     if (!id) return alert('Brak aktywnego raportu');
-    const reports = listReports();
-    const rep = reports.find(r => r.id === id);
+    const arr = listReports();
+    const rep = arr.find(r => r.id === id);
     if (!rep) return alert('Nie znaleziono raportu');
     rep.trainNumber = rp_trainNumber.value.trim();
     rep.date = rp_date.value || rep.date;
@@ -165,8 +210,8 @@ document.addEventListener('DOMContentLoaded', () => {
   rp_export && rp_export.addEventListener('click', () => {
     const id = reportPanel.getAttribute('data-current-id');
     if (!id) return alert('Brak aktywnego raportu');
-    const reports = listReports();
-    const rep = reports.find(r => r.id === id);
+    const arr = listReports();
+    const rep = arr.find(r => r.id === id);
     if (!rep) return alert('Nie znaleziono raportu');
     const blob = new Blob([JSON.stringify(rep, null, 2)], { type: 'application/json' });
     const a = document.createElement('a');
@@ -201,11 +246,10 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
-  /* ---------- R-7 creation flow ---------- */
+  /* ---------- R-7 creation ---------- */
   btnNewR7 && btnNewR7.addEventListener('click', () => {
-    // create new empty R7 list and open editor
     const id = uid('r7');
-    const r7 = { id, createdAt: nowISO(), trainNumber: '', date: new Date().toISOString().slice(0,10), from:'', to:'', items: [] };
+    const r7 = { id, createdAt: nowISO(), trainNumber:'', date: new Date().toISOString().slice(0,10), from:'', to:'', items: [] };
     saveR7(r7);
     openR7Editor(r7.id);
   });
@@ -307,20 +351,17 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
-  /* ---------- Takeover actions (search & open) ---------- */
+  /* ---------- Takeover actions ---------- */
   btnTakeoverReport && btnTakeoverReport.addEventListener('click', () => {
-    // show simple prompt to enter report number or list
     const q = prompt('Wpisz numer pociągu lub numer raportu (lub zostaw puste, aby wyświetlić listę):','');
     const arr = listReports();
     if (!q) {
-      // show list and allow open
       const pick = arr.map((r,i)=>`${i+1}. ${r.number || r.trainNumber || '(brak)'} — ${r.date || ''}`).join('\n');
       const sel = prompt('Wybierz numer z listy (np. 1):\n' + (pick || 'Brak raportów'), '');
       const idx = parseInt(sel,10) - 1;
       if (!isNaN(idx) && arr[idx]) openReportEditor(arr[idx].id);
       return;
     }
-    // try find by number or trainNumber
     const found = arr.find(r => (r.number && r.number.includes(q)) || (r.trainNumber && r.trainNumber.includes(q)));
     if (found) openReportEditor(found.id); else alert('Nie znaleziono raportu dla podanego numeru.');
   });
@@ -334,7 +375,7 @@ document.addEventListener('DOMContentLoaded', () => {
     if (!isNaN(idx) && arr[idx]) openR7Editor(arr[idx].id);
   });
 
-  /* ---------- Phonebook (dummy) ---------- */
+  /* ---------- Phonebook ---------- */
   function renderPhonebook() {
     const sample = [
       { name:'Dyspozytor', role:'Dyspozycja', number:'+48 22 111 22 33' },
@@ -348,6 +389,6 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
-  /* ---------- Initial render of lists if needed ---------- */
-  // nothing to do on load; lists render when panels open
+  // initial view
+  showOnly(dashboard);
 });
