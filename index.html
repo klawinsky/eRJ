@@ -16,6 +16,7 @@
     .discount-badge { font-size:0.85rem; }
     .print-container { font-family: Arial, Helvetica, sans-serif; font-size:12px; padding:10px; }
     footer { opacity:.8; }
+    .hidden { display:none !important; }
   </style>
 </head>
 <body>
@@ -67,7 +68,7 @@
             <div class="card tile" id="tileHandleTrain" role="button" tabindex="0">
               <div class="card-body text-center">
                 <h5>Obsłuż pociąg</h5>
-                <p class="small text-muted">Nowy raport, karta próby, wykaz R‑7</p>
+                <p class="small text-muted">Nowy raport, karta próby, wykaz R‑7 (wewnątrz)</p>
               </div>
             </div>
           </div>
@@ -91,10 +92,19 @@
           </div>
 
           <div class="col-12 col-md-4">
-            <div class="card tile-link" id="tileRegiojet">
+            <div class="card tile-link" id="tileRegiojetPL">
               <div class="card-body text-center">
-                <h5>Strona RegioJet</h5>
-                <a class="stretched-link" href="https://regiojet.pl/" target="_blank" rel="noopener">Otwórz</a>
+                <h5>Rozkład PL</h5>
+                <a class="stretched-link" href="https://rozklad-pkp.pl" target="_blank" rel="noopener">Otwórz rozkład PL</a>
+              </div>
+            </div>
+          </div>
+
+          <div class="col-12 col-md-4">
+            <div class="card tile-link" id="tileRozkladCZ">
+              <div class="card-body text-center">
+                <h5>Rozkład CZ</h5>
+                <a class="stretched-link" href="https://www.cd.cz" target="_blank" rel="noopener">Otwórz rozkład CZ</a>
               </div>
             </div>
           </div>
@@ -103,26 +113,16 @@
             <div class="card tile-link" id="tilePhonebook">
               <div class="card-body text-center">
                 <h5>Książka telefoniczna</h5>
-                <p class="small text-muted">Wyświetlanie spisu numerów z repozytorium</p>
+                <p class="small text-muted">Wyświetlanie spisu numerów</p>
               </div>
             </div>
           </div>
 
-          <div class="col-12 col-md-4">
-            <div class="card tile" id="tileR7" role="button" tabindex="0">
-              <div class="card-body text-center">
-                <h5>Wykaz pojazdów R-7</h5>
-                <p class="small text-muted">Tworzenie i analiza wykazu pojazdów</p>
-              </div>
-            </div>
-          </div>
-
-          <!-- NOWA ZAKŁADKA: ZNIŻKI -->
           <div class="col-12 col-md-4">
             <div class="card tile" id="tileDiscounts" role="button" tabindex="0">
               <div class="card-body text-center">
                 <h5>Zniżki ustawowe - PL</h5>
-                <p class="small text-muted">Spis zniżek krajowych z szybkim wyszukiwaniem</p>
+                <p class="small text-muted">Spis zniżek krajowych</p>
               </div>
             </div>
           </div>
@@ -130,8 +130,91 @@
         </div>
       </div>
 
-      <!-- PLACEHOLDERS FOR PANELS (existing panels omitted for brevity) -->
-      <div id="discountsPanel" class="card p-3 mb-3" style="display:none;">
+      <!-- HANDLE TRAIN SUBPAGE (contains R-7 inside) -->
+      <div id="handleTrainMenu" class="card p-3 mb-3 hidden">
+        <div class="d-flex justify-content-between align-items-center">
+          <h5 class="mb-0">Obsłuż pociąg</h5>
+          <div>
+            <button id="backFromHandle" class="btn btn-sm btn-outline-secondary">Powrót</button>
+            <button id="homeFromHandle" class="btn btn-sm btn-outline-primary">Strona główna</button>
+          </div>
+        </div>
+        <hr>
+        <div class="mb-3">
+          <button id="btnNewReport" class="btn btn-primary btn-sm me-2">Nowy raport</button>
+          <button id="btnNewR7" class="btn btn-outline-secondary btn-sm">Nowy wykaz R-7</button>
+        </div>
+
+        <!-- R-7 panel (only here) -->
+        <div id="r7Panel" class="card p-3 mb-3">
+          <div class="d-flex justify-content-between align-items-center mb-2">
+            <h6 class="mb-0">Wykaz pojazdów R-7</h6>
+            <div>
+              <button id="r7_addLocomotive" class="btn btn-sm btn-outline-primary">Dodaj lokomotywę</button>
+              <button id="r7_addWagon" class="btn btn-sm btn-outline-primary">Dodaj wagon</button>
+              <button id="r7_analyze" class="btn btn-sm btn-outline-success">Analiza</button>
+              <button id="r7_print_pdf" class="btn btn-sm btn-outline-secondary">Drukuj w PDF</button>
+            </div>
+          </div>
+
+          <div class="mb-2">
+            <div class="row g-2">
+              <div class="col-6 col-md-3"><input id="r7_trainNumber" class="form-control" placeholder="Nr pociągu"></div>
+              <div class="col-6 col-md-3"><input id="r7_date" type="date" class="form-control"></div>
+              <div class="col-6 col-md-3"><input id="r7_from" class="form-control" placeholder="Ze stacji"></div>
+              <div class="col-6 col-md-3"><input id="r7_to" class="form-control" placeholder="Do stacji"></div>
+            </div>
+          </div>
+
+          <div id="r7List" class="list-group mb-2" style="min-height:120px;"></div>
+
+          <div id="r7Results" class="card p-2" style="display:none;">
+            <div class="row">
+              <div class="col-6 col-md-3">Długość: <strong id="res_length">-</strong></div>
+              <div class="col-6 col-md-3">Masa wagony: <strong id="res_mass_wagons">-</strong></div>
+              <div class="col-6 col-md-3">Masa pociągu: <strong id="res_mass_total">-</strong></div>
+              <div class="col-6 col-md-3">Masa ham. pociągu: <strong id="res_brake_total">-</strong></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- TAKEOVER -->
+      <div id="takeOverMenu" class="card p-3 mb-3 hidden">
+        <div class="d-flex justify-content-between align-items-center">
+          <h5 class="mb-0">Przejmij pociąg</h5>
+          <div>
+            <button id="backFromTakeover" class="btn btn-sm btn-outline-secondary">Powrót</button>
+            <button id="homeFromTakeover" class="btn btn-sm btn-outline-primary">Strona główna</button>
+          </div>
+        </div>
+        <hr>
+        <form id="takeoverForm" class="row g-2">
+          <div class="col-6 col-md-4"><input id="takeoverTrainNumber" class="form-control" placeholder="Numer pociągu"></div>
+          <div class="col-6 col-md-4"><input id="takeoverDate" type="date" class="form-control"></div>
+          <div class="col-12 col-md-4"><button class="btn btn-primary">Przejmij</button></div>
+        </form>
+        <div id="takeoverMsg" class="small text-danger mt-2"></div>
+      </div>
+
+      <!-- PHONEBOOK -->
+      <div id="phonebookPanel" class="card p-3 mb-3 hidden">
+        <div class="d-flex justify-content-between align-items-center">
+          <h5 class="mb-0">Książka telefoniczna</h5>
+          <div>
+            <button id="backFromPhonebook" class="btn btn-sm btn-outline-secondary">Powrót</button>
+            <button id="homeFromPhonebook" class="btn btn-sm btn-outline-primary">Strona główna</button>
+          </div>
+        </div>
+        <hr>
+        <table id="phonebookTable" class="table table-sm">
+          <thead><tr><th>Imię i nazwisko</th><th>Stanowisko</th><th>Telefon</th><th>Godziny</th></tr></thead>
+          <tbody><tr><td colspan="4" class="text-muted small">Brak danych. Załaduj z repozytorium lub importuj.</td></tr></tbody>
+        </table>
+      </div>
+
+      <!-- DISCOUNTS -->
+      <div id="discountsPanel" class="card p-3 mb-3 hidden">
         <div class="d-flex justify-content-between align-items-center">
           <h5 class="mb-0">Zniżki ustawowe - PL</h5>
           <div>
@@ -142,7 +225,7 @@
         <hr>
         <div class="row g-2 mb-3">
           <div class="col-12 col-md-6">
-            <input id="discountSearch" class="form-control search-input" placeholder="Szukaj zniżki, kodu, grupy (np. student, senior, dziecko)...">
+            <input id="discountSearch" class="form-control search-input" placeholder="Szukaj zniżki, kodu, grupy...">
           </div>
           <div class="col-12 col-md-3">
             <select id="discountFilterType" class="form-select">
@@ -168,12 +251,12 @@
           <div id="discountDetailsContent" class="card p-2"></div>
         </div>
 
-        <div class="small text-muted mt-3">Dane można importować z pliku CSV (kolumny: kod;nazwa;typ;wartość;opis). Domyślne dane załadowane z systemu.</div>
+        <div class="small text-muted mt-3">Dane można importować z pliku CSV (kolumny: kod;nazwa;typ;wartość;opis).</div>
       </div>
 
       <!-- Footer -->
       <footer class="mt-4 mb-2 text-center small text-muted">
-        Stworzone z pomocą sztucznej inteligencji Copilot przez Paweł Klawiński v0.1
+        Stworzone z pomocą Copilot — Paweł Klawiński v0.1
       </footer>
     </div>
   </div>
@@ -184,6 +267,7 @@
   <script type="module" src="js/db.js"></script>
   <script type="module" src="js/auth.js"></script>
   <script type="module" src="js/discounts.js"></script>
+  <script type="module" src="js/pdf.js"></script>
   <script type="module" src="js/app.js"></script>
 </body>
 </html>
