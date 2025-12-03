@@ -9,7 +9,6 @@
   <link href="css/styles.css" rel="stylesheet">
   <link rel="manifest" href="/manifest.json">
   <style>
-    /* Minimal styles to keep layout readable */
     .tile { cursor: pointer; }
     .tile:hover { box-shadow: 0 2px 8px rgba(0,0,0,0.08); transform: translateY(-2px); transition: .12s; }
     .station-row { padding: .5rem 0; border-bottom: 1px dashed #e9ecef; }
@@ -153,7 +152,8 @@
           <div class="d-flex gap-2 flex-wrap">
             <button id="btnNewReport" class="btn btn-primary">Nowy raport z jazdy</button>
             <button id="btnNewBrake" class="btn btn-secondary disabled" disabled>Nowa karta próby hamulca (nieaktywna)</button>
-            <button id="btnNewR7" class="btn btn-secondary disabled" disabled>Nowy wykaz pojazdów R‑7 (nieaktywne)</button>
+            <!-- PRZYCISEK URUCHOMIONY: Nowy wykaz R-7 -->
+            <button id="btnNewR7" class="btn btn-outline-primary">Nowy wykaz pojazdów R‑7</button>
           </div>
         </div>
       </div>
@@ -298,7 +298,7 @@
       <div class="modal fade" id="modalTraction" tabindex="-1" aria-hidden="true">
         <div class="modal-dialog">
           <form id="formTraction" class="modal-content" data-mode="add" data-index="">
-            <div class="modal-header"><h5 class="modal-title">Dodaj/Edytuj członka drużyny trakcyjnej</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+            <div class="modal-header"><h5 class="modal-title">Dodaj/Edytuj członka drużyny trakcyjnej</h5><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Zamknij"></button></div>
             <div class="modal-body">
               <div class="mb-2"><label class="form-label small">Imię i nazwisko</label><input id="t_name" class="form-control" required></div>
               <div class="mb-2"><label class="form-label small">Nr służbowy</label><input id="t_id" class="form-control" required></div>
@@ -316,7 +316,7 @@
       <div class="modal fade" id="modalConductor" tabindex="-1" aria-hidden="true">
         <div class="modal-dialog">
           <form id="formConductor" class="modal-content" data-mode="add" data-index="">
-            <div class="modal-header"><h5 class="modal-title">Dodaj/Edytuj członka drużyny konduktorskiej</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+            <div class="modal-header"><h5 class="modal-title">Dodaj/Edytuj członka drużyny konduktorskiej</h5><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Zamknij"></button></div>
             <div class="modal-body">
               <div class="mb-2"><label class="form-label small">Imię i nazwisko</label><input id="c_name" class="form-control" required></div>
               <div class="mb-2"><label class="form-label small">Nr służbowy</label><input id="c_id" class="form-control" required></div>
@@ -334,7 +334,7 @@
       <div class="modal fade" id="modalOrder" tabindex="-1" aria-hidden="true">
         <div class="modal-dialog">
           <form id="formOrder" class="modal-content" data-mode="add" data-index="">
-            <div class="modal-header"><h5 class="modal-title">Dodaj/Edytuj dyspozycję</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+            <div class="modal-header"><h5 class="modal-title">Dodaj/Edytuj dyspozycję</h5><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Zamknij"></button></div>
             <div class="modal-body">
               <div class="mb-2"><label class="form-label small">Nr dyspozycji</label><input id="o_number" class="form-control"></div>
               <div class="mb-2"><label class="form-label small">Godzina (HH:MM)</label><input id="o_time" class="form-control" placeholder="HH:MM"></div>
@@ -350,7 +350,7 @@
       <div class="modal fade" id="modalStation" tabindex="-1" aria-hidden="true">
         <div class="modal-dialog modal-lg">
           <form id="formStation" class="modal-content" data-mode="add" data-index="">
-            <div class="modal-header"><h5 class="modal-title">Dodaj/Edytuj dane stacji</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+            <div class="modal-header"><h5 class="modal-title">Dodaj/Edytuj dane stacji</h5><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Zamknij"></button></div>
             <div class="modal-body">
               <div class="row g-2">
                 <div class="col-12 col-md-6"><label class="form-label small">Stacja</label><input id="s_station" class="form-control" required></div>
@@ -377,7 +377,7 @@
       <div class="modal fade" id="modalControl" tabindex="-1" aria-hidden="true">
         <div class="modal-dialog">
           <form id="formControl" class="modal-content" data-mode="add" data-index="">
-            <div class="modal-header"><h5 class="modal-title">Dodaj/Edytuj kontrolę pociągu</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+            <div class="modal-header"><h5 class="modal-title">Dodaj/Edytuj kontrolę pociągu</h5><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Zamknij"></button></div>
             <div class="modal-body">
               <div class="mb-2"><label class="form-label small">Kontrolujący</label><input id="f_by" class="form-control" required></div>
               <div class="mb-2"><label class="form-label small">Nr służbowy</label><input id="f_id" class="form-control"></div>
@@ -393,7 +393,7 @@
       <div class="modal fade" id="modalNote" tabindex="-1" aria-hidden="true">
         <div class="modal-dialog">
           <form id="formNote" class="modal-content" data-mode="add" data-index="">
-            <div class="modal-header"><h5 class="modal-title">Dodaj/Edytuj uwagę</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+            <div class="modal-header"><h5 class="modal-title">Dodaj/Edytuj uwagę</h5><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Zamknij"></button></div>
             <div class="modal-body">
               <div class="mb-2"><label class="form-label small">Treść uwagi</label><textarea id="n_text" class="form-control" rows="3" required></textarea></div>
             </div>
@@ -408,7 +408,7 @@
           <form id="formR7Vehicle" class="modal-content" data-mode="add" data-index="">
             <div class="modal-header">
               <h5 class="modal-title">Dodaj pojazd (lokomotywa/wagon)</h5>
-              <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+              <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Zamknij"></button>
             </div>
             <div class="modal-body">
               <div class="row g-2">
@@ -442,7 +442,7 @@
       <div class="modal fade" id="modalUser" tabindex="-1" aria-hidden="true">
         <div class="modal-dialog">
           <form id="formUser" class="modal-content" data-mode="add" data-index="">
-            <div class="modal-header"><h5 class="modal-title">Dodaj użytkownika</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+            <div class="modal-header"><h5 class="modal-title">Dodaj użytkownika</h5><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Zamknij"></button></div>
             <div class="modal-body">
               <div class="mb-2"><label class="form-label">Imię i nazwisko</label><input id="u_name" class="form-control" required></div>
               <div class="mb-2"><label class="form-label">Numer służbowy</label><input id="u_id" class="form-control" required></div>
