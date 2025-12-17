@@ -20,7 +20,7 @@ import {
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 
-/* ---------- Users ---------- */
+/* Users */
 export async function listUsers() {
   const snap = await getDocs(collection(db, 'users'));
   return snap.docs.map(d => ({ uid: d.id, ...d.data() }));
@@ -70,7 +70,7 @@ export async function findUserByIdOrEmail(key) {
   return await getUserByEmailOrId(key);
 }
 
-/* ---------- Reports ---------- */
+/* Reports */
 export async function listReports() {
   const snap = await getDocs(collection(db, 'reports'));
   return snap.docs.map(d => ({ id: d.id, ...d.data() }));
@@ -108,7 +108,7 @@ export async function getReport(numberOrId) {
   return null;
 }
 
-/* ---------- Counter (transaction-safe) ---------- */
+/* Counter */
 export async function nextCounter() {
   const counterRef = doc(db, 'meta', 'counters');
   const newVal = await runTransaction(db, async (tx) => {
@@ -122,7 +122,7 @@ export async function nextCounter() {
   return newVal;
 }
 
-/* ---------- Phonebook ---------- */
+/* Phonebook */
 export async function listPhonebookLocal() {
   const snap = await getDocs(collection(db, 'phonebook'));
   return snap.docs.map(d => d.data());
