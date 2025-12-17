@@ -1,73 +1,59 @@
 // js/auth.js
-// Prosty mechanizm autoryzacji dla demo.
-// Hasła są hashowane i przechowywane w localStorage (nie produkcyjne).
+import { firebaseConfig } from './firebase-config.js';
+import { initializeApp } from 'https://www.gstatic.com/firebasejs/9.22.2/firebase-app.js';
+import {
+  getAuth,
+  createUserWithEmailAndPassword,
+  signInWithEmailAndPassword,
+  signOut,
+  onAuthStateChanged,
+  updateProfile
+} from 'https://www.gstatic.com/firebasejs/9.22.2/firebase-auth.js';
 
-const LS_AUTH = 'erj_auth_v1';
-const LS_USERS = 'erj_users_v1';
-const LS_SESS = 'erj_session_v1';
-
-// Domyślny admin (seed). Możesz zmienić wartości przed pierwszym uruchomieniem.
-const ADMIN_EMAIL = 'klawinski.pawel@gmail.com';
-const ADMIN_ID = '77144';
-const ADMIN_PLAIN = 'Admin@77144';
-
-function read(key, def) {
-  try { const v = localStorage.getItem(key); return v ? JSON.parse(v) : def; } catch { return def; }
-}
-function write(key, val) { localStorage.setItem(key, JSON.stringify(val)); }
-
-async function ensureSeed() {
-  const users = read(LS_USERS, []);
-  const auth = read(LS_AUTH, {});
-  if (!users.find(u => u.email === ADMIN_EMAIL)) {
-    users.push({ name: 'Paweł Klawiński', id: ADMIN_ID, zdp: 'WAW', email: ADMIN_EMAIL, role: 'admin', status: 'active' });
-    write(LS_USERS, users);
-  }
-  if (!auth[ADMIN_EMAIL]) {
-    auth[ADMIN_EMAIL] = await hashPassword(ADMIN_PLAIN);
-    write(LS_AUTH, auth);
-  }
-}
+const app = initializeApp(firebaseConfig);
+const auth = getAuth(app);
 
 export async function initAuth() {
-  await ensureSeed();
-  return ADMIN_PLAIN;
+  // Zwracamy placeholder (kompatybilność z dotychczasowym kodem demo)
+  return 'admin-placeholder';
 }
 
 export async function registerUser({ name, id, zdp, email, password, role, status }) {
-  const users = read(LS_USERS, []);
-  if (users.find(u => u.email === email || u.id === id)) throw new Error('Użytkownik już istnieje');
-  users.push({ name, id, zdp, email, role: role || 'user', status: status || 'active' });
-  write(LS_USERS, users);
-  const auth = read(LS_AUTH, {});
-  auth[email] = await hashPassword(password);
-  write(LS_AUTH, auth);
+  if (!email || !password) throw new Error('Email i hasło są wymagane');
+  const cred = await createUserWithEmailAndPassword(auth, email, password);
+  await updateProfile(cred.user, { displayName: name || '' });
+  // zapis profilu w Firestore (db.addUserProfile)
+  const { addUserProfile } = await import('./db.js');
+  await addUserProfile({ uid: cred.user.uid, name, id, zdp, email, role: role || 'user', status: status || 'active' });
   return true;
 }
 
 export async function login(idOrEmail, password, remember = false) {
-  const users = read(LS_USERS, []);
-  const user = users.find(u => u.email === idOrEmail || u.id === idOrEmail);
-  if (!user) return { ok: false, reason: 'Nieprawidłowy login' };
-  const auth = read(LS_AUTH, {});
-  const hash = auth[user.email];
-  if (!hash) return { ok: false, reason: 'Brak hasła' };
-  const pwHash = await hashPassword(password);
-  if (pwHash !== hash) return { ok: false, reason: 'Nieprawidłowe hasło' };
-  const session = { user, at: new Date().toISOString() };
-  if (remember) localStorage.setItem(LS_SESS, JSON.stringify(session)); else sessionStorage.setItem(LS_SESS, JSON.stringify(session));
-  return { ok: true, user };
+  const isEmail = /\S+@\S+\.\S+/.test(idOrEmail);
+  let emailToUse = idOrEmail;
+  if (!isEmail) {
+    const { findUserByIdOrEmail } = await import('./db.js');
+    const u = await findUserByIdOrEmail(idOrEmail);
+    if (!u) return { ok: false, reason: 'Nieprawidłowy login' };
+    emailToUse = u.email;
+  }
+  try {
+    const cred = await signInWithEmailAndPassword(auth, emailToUse, password);
+    const user = { id: cred.user.uid, name: cred.user.displayName || cred.user.email, email: cred.user.email, role: 'user' };
+    return { ok: true, user };
+  } catch (err) {
+    return { ok: false, reason: err.message || 'Błąd logowania' };
+  }
 }
 
 export function logout() {
-  localStorage.removeItem(LS_SESS);
-  sessionStorage.removeItem(LS_SESS);
+  return signOut(auth);
 }
 
 export function currentUser() {
-  const s = sessionStorage.getItem(LS_SESS) || localStorage.getItem(LS_SESS);
-  if (!s) return null;
-  try { const obj = JSON.parse(s); return obj.user; } catch { return null; }
+  const u = auth.currentUser;
+  if (!u) return null;
+  return { id: u.uid, name: u.displayName || u.email, email: u.email };
 }
 
 export async function hashPassword(pw) {
@@ -76,4 +62,11 @@ export async function hashPassword(pw) {
   const buf = await crypto.subtle.digest('SHA-256', data);
   const hex = Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2, '0')).join('');
   return hex;
+}
+
+export function onAuthChange(cb) {
+  return onAuthStateChanged(auth, (user) => {
+    if (user) cb({ id: user.uid, name: user.displayName || user.email, email: user.email });
+    else cb(null);
+  });
 }
