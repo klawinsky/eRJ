@@ -13,16 +13,12 @@ import {
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 
-export async function initAuth() {
-  // Zwracamy placeholder (kompatybilność z dotychczasowym kodem demo)
-  return 'admin-placeholder';
-}
+export async function initAuth() { return 'admin-placeholder'; }
 
 export async function registerUser({ name, id, zdp, email, password, role, status }) {
   if (!email || !password) throw new Error('Email i hasło są wymagane');
   const cred = await createUserWithEmailAndPassword(auth, email, password);
   await updateProfile(cred.user, { displayName: name || '' });
-  // zapis profilu w Firestore (db.addUserProfile)
   const { addUserProfile } = await import('./db.js');
   await addUserProfile({ uid: cred.user.uid, name, id, zdp, email, role: role || 'user', status: status || 'active' });
   return true;
@@ -46,9 +42,7 @@ export async function login(idOrEmail, password, remember = false) {
   }
 }
 
-export function logout() {
-  return signOut(auth);
-}
+export function logout() { return signOut(auth); }
 
 export function currentUser() {
   const u = auth.currentUser;
@@ -60,8 +54,7 @@ export async function hashPassword(pw) {
   const enc = new TextEncoder();
   const data = enc.encode((pw || '') + '::erj_salt_v1');
   const buf = await crypto.subtle.digest('SHA-256', data);
-  const hex = Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2, '0')).join('');
-  return hex;
+  return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2, '0')).join('');
 }
 
 export function onAuthChange(cb) {
