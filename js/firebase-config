@@ -1,5 +1,4 @@
 // js/firebase-config.js
-// Konfiguracja Firebase (web app) — wklejona z konsoli Firebase
 export const firebaseConfig = {
   apiKey: "AIzaSyDkT6b71bvy_AC3A3p8tBzQPe6vnPcX3bQ",
   authDomain: "erj---teczka-44ee7.firebaseapp.com",
